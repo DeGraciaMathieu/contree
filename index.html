@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Bocage — POC</title>
+<title>Contrée — POC</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Karla:wght@400;600&display=swap" rel="stylesheet">
@@ -27,6 +27,7 @@
 
   header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
   .brand{font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:.01em}
+  .brand .emo{font-size:.85em;margin-right:6px;font-family:system-ui,sans-serif}
   .brand small{display:block;font-family:'Karla';font-weight:400;font-size:11px;
     color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
   .score{text-align:right;line-height:1}
@@ -103,9 +104,18 @@
   .insp .rule{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.35}
   .fade{animation:fade .35s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
-  .over .rule{font-size:13px;line-height:1.45;color:var(--pale);padding:7px 0;
+  .rule{font-size:13px;line-height:1.45;color:var(--pale);padding:7px 0;
     border-bottom:1px solid var(--line)}
-  .over .rule b{color:var(--ochre);font-weight:600}
+  .rule b{color:var(--ochre);font-weight:600}
+  .modal{position:fixed;inset:0;z-index:50;display:none;padding:18px;
+    background:rgba(8,18,19,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    align-items:center;justify-content:center;animation:fade .2s ease}
+  .modal.on{display:flex}
+  .modal .card{width:100%;max-width:420px;max-height:82dvh;overflow-y:auto;
+    background:var(--ink-2);border:1px solid var(--line);border-radius:18px;
+    padding:18px 18px 16px;-webkit-overflow-scrolling:touch}
+  .modal h2{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0 0 10px}
+  .modal .card button{margin-top:16px;width:100%}
   button.link{background:none;border:0;padding:2px 5px;color:var(--muted);
     font-size:11px;letter-spacing:.12em;text-transform:uppercase}
   .next .link:first-of-type{margin-left:auto}
@@ -117,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">Bocage<small>Pose libre</small></div>
+    <div class="brand"><span class="emo">🌿</span>Contrée<small>Un pays à poser</small></div>
     <div class="score"><b id="score">0</b><span>points</span></div>
   </header>
 
@@ -126,17 +136,6 @@
     <div class="insp" id="insp">
       <div class="ttl"><span id="insp-t"></span><button id="insp-x">✕</button></div>
       <div id="insp-b"></div>
-    </div>
-    <div class="over" id="sheet">
-      <h2>Comment ça compte</h2>
-      <div class="rule"><b>Massifs</b> — un groupe de forêts, champs ou pierres vaut sa taille au carré une fois entièrement entouré. Grand et compact vaut mieux que dispersé.</div>
-      <div class="rule"><b>Rivières</b> — 3 points par tuile d'eau reliée, et 40 de plus si la rivière relie deux bords opposés.</div>
-      <div class="rule"><b>Villages</b> — 2 points par terrain différent autour, doublé s'ils touchent l'eau.</div>
-      <div class="rule"><b>Commandes</b> — 15 points quand la demande d'une tuile est satisfaite. Ratée, elle ne coûte rien.</div>
-      <div class="rule"><b>Pont</b> — tuile d'eau rare : elle enjambe une case et raccorde une rivière séparée en deux.</div>
-      <div class="rule"><b>Moulin</b> — champ rare : 4 points de plus pour chaque village voisin.</div>
-      <div class="rule"><b>Défausse</b> — trois tuiles jetables par partie, pour la pierre qui casserait tout.</div>
-      <button class="primary" id="closesheet">Fermer</button>
     </div>
     <div class="over" id="over">
       <h2>Le pays est complet</h2>
@@ -170,6 +169,20 @@
     <button id="sound" class="link">Son</button>
     <button id="rules" class="link">Règles</button>
     <button id="reset" class="link">Nouvelle</button>
+  </div>
+</div>
+
+<div class="modal" id="sheet">
+  <div class="card">
+    <h2>Comment ça compte</h2>
+      <div class="rule"><b>Massifs</b> — un groupe de forêts, champs ou pierres vaut sa taille au carré une fois entièrement entouré. Grand et compact vaut mieux que dispersé.</div>
+      <div class="rule"><b>Rivières</b> — 3 points par tuile d'eau reliée, et 40 de plus si la rivière relie deux bords opposés.</div>
+      <div class="rule"><b>Villages</b> — 2 points par terrain différent autour, doublé s'ils touchent l'eau.</div>
+      <div class="rule"><b>Commandes</b> — 15 points quand la demande d'une tuile est satisfaite. Ratée, elle ne coûte rien.</div>
+      <div class="rule"><b>Pont</b> — tuile d'eau rare : elle enjambe une case et raccorde une rivière séparée en deux.</div>
+      <div class="rule"><b>Moulin</b> — champ rare : 4 points de plus pour chaque village voisin.</div>
+      <div class="rule"><b>Défausse</b> — trois tuiles jetables par partie, pour la pierre qui casserait tout.</div>
+    <button class="primary" id="closesheet">Fermer</button>
   </div>
 </div>
 
@@ -646,10 +659,15 @@ function render(){
       const e = effects.find(e=>e.k===k && e.type==='pop');
       const grow = e ? Math.min(1,(now-e.t)/220) : 1;
       const j = effects.find(e=>e.k===k && e.type==='jolt');
-      let jolt = 1;
-      if(j && !REDUCED){                          // la voisine encaisse la pose : 2 % puis retour
-        const jp = (now-j.t)/260;
-        if(jp>0 && jp<1) jolt = 1 - .02*Math.sin(jp*Math.PI);
+      let jolt = 1, jx = 0, jy = 0;
+      if(j && !REDUCED){                          // la voisine encaisse le choc : elle recule puis revient
+        const jp = (now-j.t)/300;
+        if(jp>0 && jp<1){
+          const w = Math.sin(jp*Math.PI);
+          jolt = 1 - .05*w;
+          const push = Math.max(1.5, S*.10)*w;
+          jx = j.ox*push; jy = j.oy*push;
+        }
       }
       const s = S*jolt*(REDUCED?1:(0.72+0.28*(1-Math.pow(1-grow,3))));
       const dim = insp && !insp.set.has(k);
@@ -658,8 +676,8 @@ function render(){
       const ct = closedAt.get(k);
       const shut = ct!==undefined && now>=ct;
       const flash = shut && !REDUCED ? Math.max(0, 1-(now-ct)/320) : 0;
-      paintTile(c.terrain,x,y,s,{closed:shut, flash, rare:c.rare, glow:cachedScore.glow.has(k)});
-      cmdMark({cmd:c.cmd,done:doneCmds.has(k)},x,y,S);
+      paintTile(c.terrain,x+jx,y+jy,s,{closed:shut, flash, rare:c.rare, glow:cachedScore.glow.has(k)});
+      cmdMark({cmd:c.cmd,done:doneCmds.has(k)},x+jx,y+jy,S);
       if(c.terrain==='village') puffs.push([x,y,q,r,dim?0.3:1]);
       if(dim) ctx.restore();
       if(insp && insp.k===k){
@@ -688,7 +706,7 @@ function render(){
     ctx.lineWidth=Math.max(1.6,S*.1); ctx.strokeStyle='#d9a441';
     hexPath(x,y,S*.955); ctx.stroke();
   }
-  effects = effects.filter(e=>now-e.t < (e.type==='float'?1100:400));
+  effects = effects.filter(e=>now-e.t < (e.type==='float'?1100:(e.type==='jolt'?340:400)));
   for(const e of effects){
     if(e.type!=='float') continue;
     const p=(now-e.t)/1100, [x,y]=px(e.q,e.r);
@@ -909,9 +927,12 @@ function commit(){
   if(gain!==0) effects.push({type:'float',q:ghost[0],r:ghost[1],n:gain,t:performance.now()});
   snd.clac(); buzz(8); hideInspect();
   spawnDust(ghost[0],ghost[1]);
+  const [cx,cy] = px(ghost[0],ghost[1]);
   for(const [nq,nr] of neighbors(ghost[0],ghost[1])){
     const nk = key(nq,nr);
-    if(board.has(nk)) effects.push({type:'jolt', k:nk, t:performance.now()+40});
+    if(!board.has(nk)) continue;
+    const [nx,ny] = px(nq,nr), d = Math.hypot(nx-cx,ny-cy) || 1;
+    effects.push({type:'jolt', k:nk, t:performance.now()+40, ox:(nx-cx)/d, oy:(ny-cy)/d});
   }
   cascade(k);
   syncClosed(false);
@@ -1025,6 +1046,7 @@ el('sound').addEventListener('click', ()=>{
 el('reset').addEventListener('click', newGame);
 el('rules').addEventListener('click', ()=>el('sheet').classList.add('on'));
 el('closesheet').addEventListener('click', ()=>el('sheet').classList.remove('on'));
+el('sheet').addEventListener('click', ev=>{ if(ev.target===el('sheet')) el('sheet').classList.remove('on'); });
 el('again').addEventListener('click', newGame);
 el('again2').addEventListener('click', newGame);
 el('seeboard').addEventListener('click', ()=>over.classList.remove('on'));
