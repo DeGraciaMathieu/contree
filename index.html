@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Bocage — POC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Karla:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0c1a1b;
+    --ink-2:#122526;
+    --ink-3:#1a3234;
+    --line:#27484a;
+    --pale:#e6e0d2;
+    --muted:#8fa5a2;
+    --ochre:#d9a441;
+    --ochre-dim:#8a6b2c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--pale);
+    font-family:'Karla',system-ui,sans-serif;overscroll-behavior:none}
+  body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .wrap{width:100%;max-width:440px;display:flex;flex-direction:column;gap:10px;padding:10px 12px 14px}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .brand{font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:.01em}
+  .brand small{display:block;font-family:'Karla';font-weight:400;font-size:11px;
+    color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
+  .score{text-align:right;line-height:1}
+  .score b{font-family:'Fraunces',serif;font-weight:600;font-size:34px;
+    font-variant-numeric:tabular-nums;display:block}
+  .score span{font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+
+  .boardwrap{position:relative;background:var(--ink-2);border:1px solid var(--line);
+    border-radius:18px;overflow:hidden}
+  canvas#board{display:block;width:100%;touch-action:manipulation}
+
+  .status{min-height:34px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    font-size:13px;color:var(--muted);padding:0 2px}
+  .status .delta{font-family:'Fraunces',serif;font-size:19px;color:var(--ochre);
+    font-variant-numeric:tabular-nums}
+  .status .delta.zero{color:var(--muted)}
+
+  .actions{display:flex;gap:8px}
+  button{font-family:'Karla',sans-serif;font-size:14px;font-weight:600;border-radius:11px;
+    border:1px solid var(--line);background:var(--ink-3);color:var(--pale);
+    padding:11px 14px;cursor:pointer;transition:transform .08s ease,background .15s ease}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.35;cursor:default}
+  button.primary{background:var(--ochre);border-color:var(--ochre);color:#241a06;flex:1}
+  button:focus-visible{outline:2px solid var(--ochre);outline-offset:2px}
+
+  .hand{display:flex;gap:8px}
+  .slot{flex:1;background:var(--ink-2);border:1px solid var(--line);border-radius:14px;
+    padding:8px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:4px;
+    cursor:pointer;transition:border-color .15s ease,background .15s ease}
+  .slot.on{border-color:var(--ochre);background:#1d2a20}
+  .slot.used{opacity:.22;pointer-events:none}
+  .slot canvas{width:52px;height:60px;transition:filter .18s ease}
+  .slot.on canvas{animation:bob 2.4s ease-in-out infinite;
+    filter:drop-shadow(0 7px 7px rgba(0,0,0,.5))}
+  @keyframes bob{0%,100%{transform:translateY(-3px)}50%{transform:translateY(-6px)}}
+  .slot.deal{animation:deal .34s cubic-bezier(.2,.85,.3,1) both}
+  @keyframes deal{from{opacity:0;transform:translateX(32px) rotate(2.5deg)}
+    to{opacity:1;transform:none}}
+  .slot .cmd{font-size:10px;line-height:1.15;text-align:center;color:var(--ochre);
+    min-height:24px;padding:0 2px}
+  .slot .cmd.none{color:var(--muted);opacity:.5}
+
+  .next{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);
+    letter-spacing:.12em;text-transform:uppercase}
+  .next canvas{width:22px;height:26px}
+
+  .over{position:absolute;inset:0;background:rgba(12,26,27,.94);display:none;
+    flex-direction:column;justify-content:center;gap:6px;padding:26px}
+  .over.on{display:flex}
+  .over h2{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0 0 8px}
+  .over .row{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;
+    border-bottom:1px solid var(--line)}
+  .over .row.tot{border:0;margin-top:6px;font-family:'Fraunces',serif;font-size:21px}
+  .over button{margin-top:16px}
+  .over .pair{display:flex;gap:8px}
+  .over .pair button{flex:1}
+  .endbar{display:none;gap:8px}
+  body.done .endbar{display:flex}
+  body.done .actions, body.done .hand, body.done .next{display:none}
+  .endbar button{flex:1}
+  .insp{position:absolute;left:8px;right:8px;bottom:8px;display:none;
+    background:rgba(16,34,35,.965);border:1px solid var(--line);border-radius:14px;
+    padding:9px 12px 11px;animation:fade .18s ease}
+  .insp.on{display:block}
+  .insp .ttl{display:flex;justify-content:space-between;align-items:center;
+    font-family:'Fraunces',serif;font-size:15px;margin-bottom:4px}
+  .insp .ttl button{background:none;border:0;color:var(--muted);font-size:15px;padding:0 2px}
+  .insp .l{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:3px 0;border-top:1px solid rgba(39,72,74,.6)}
+  .insp .l span:last-child{color:var(--ochre);font-variant-numeric:tabular-nums;
+    text-align:right;white-space:nowrap}
+  .insp .l.dim span:last-child{color:var(--muted)}
+  .insp .rule{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.35}
+  .fade{animation:fade .35s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .over .rule{font-size:13px;line-height:1.45;color:var(--pale);padding:7px 0;
+    border-bottom:1px solid var(--line)}
+  .over .rule b{color:var(--ochre);font-weight:600}
+  button.link{background:none;border:0;padding:2px 5px;color:var(--muted);
+    font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+  .next .link:first-of-type{margin-left:auto}
+  .slot .cmd.rare{color:#f0d089;font-weight:600}
+  #discard{white-space:nowrap}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Bocage<small>Pose libre</small></div>
+    <div class="score"><b id="score">0</b><span>points</span></div>
+  </header>
+
+  <div class="boardwrap">
+    <canvas id="board"></canvas>
+    <div class="insp" id="insp">
+      <div class="ttl"><span id="insp-t"></span><button id="insp-x">✕</button></div>
+      <div id="insp-b"></div>
+    </div>
+    <div class="over" id="sheet">
+      <h2>Comment ça compte</h2>
+      <div class="rule"><b>Massifs</b> — un groupe de forêts, champs ou pierres vaut sa taille au carré une fois entièrement entouré. Grand et compact vaut mieux que dispersé.</div>
+      <div class="rule"><b>Rivières</b> — 3 points par tuile d'eau reliée, et 40 de plus si la rivière relie deux bords opposés.</div>
+      <div class="rule"><b>Villages</b> — 2 points par terrain différent autour, doublé s'ils touchent l'eau.</div>
+      <div class="rule"><b>Commandes</b> — 15 points quand la demande d'une tuile est satisfaite. Ratée, elle ne coûte rien.</div>
+      <div class="rule"><b>Pont</b> — tuile d'eau rare : elle enjambe une case et raccorde une rivière séparée en deux.</div>
+      <div class="rule"><b>Moulin</b> — champ rare : 4 points de plus pour chaque village voisin.</div>
+      <div class="rule"><b>Défausse</b> — trois tuiles jetables par partie, pour la pierre qui casserait tout.</div>
+      <button class="primary" id="closesheet">Fermer</button>
+    </div>
+    <div class="over" id="over">
+      <h2>Le pays est complet</h2>
+      <div id="breakdown"></div>
+      <div class="pair">
+        <button id="seeboard">Voir le plateau</button>
+        <button class="primary" id="again">Recommencer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span id="hint">Choisis une tuile.</span>
+    <span class="delta" id="delta"></span>
+  </div>
+
+  <div class="endbar" id="endbar">
+    <button id="seescore" class="primary">Voir le score</button>
+    <button id="again2">Nouvelle partie</button>
+  </div>
+
+  <div class="actions">
+    <button id="place" class="primary" disabled>Poser</button>
+    <button id="discard" disabled>Défausser <span id="dleft">3</span></button>
+    <button id="undo" disabled>Annuler</button>
+  </div>
+
+  <div class="hand" id="hand"></div>
+
+  <div class="next">Ensuite<span id="nextrow" style="display:flex;gap:2px"></span>
+    <button id="sound" class="link">Son</button>
+    <button id="rules" class="link">Règles</button>
+    <button id="reset" class="link">Nouvelle</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const R = 4;                       // rayon du plateau
+const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+const TERRAINS = {
+  foret:   {name:'Forêt',   fill:'#3d6b46', dark:'#2a4c31', light:'#5c8f63'},
+  champ:   {name:'Champ',   fill:'#b9903c', dark:'#8f6d29', light:'#d9b563'},
+  eau:     {name:'Eau',     fill:'#2f6f80', dark:'#22525f', light:'#5ea3b3'},
+  pierre:  {name:'Pierre',  fill:'#6d6f7a', dark:'#4f515b', light:'#9597a2'},
+  village: {name:'Village', fill:'#b2563a', dark:'#8a3f28', light:'#d3805f'},
+};
+const WEIGHTS = [['foret',30],['champ',25],['eau',20],['pierre',15],['village',10]];
+
+const COMMANDS = {
+  foret_massif5:   {on:'foret',   text:'Massif de 5 forêts'},
+  village_forets3: {on:'village', text:'3 forêts autour'},
+  village_eau:     {on:'village', text:'2 eaux autour'},
+  champ_villages2: {on:'champ',   text:'2 villages autour'},
+  pierre_isolee:   {on:'pierre',  text:'Aucune pierre autour'},
+};
+const CMD_BONUS = 15;
+
+const RARES = {
+  pont:   {on:'eau',   name:'Pont',   hint:'enjambe une case'},
+  moulin: {on:'champ', name:'Moulin', hint:'+4 par village voisin'},
+};
+const RARE_CHANCE = 0.14;
+const MOULIN_BONUS = 4;
+const DISCARDS_MAX = 3;
+
+/* ---------- géométrie ---------- */
+const key = (q,r)=>q+','+r;
+const cells = [];
+for(let q=-R;q<=R;q++) for(let r=-R;r<=R;r++) if(Math.abs(q+r)<=R) cells.push([q,r]);
+const onBoard = (q,r)=>Math.abs(q)<=R && Math.abs(r)<=R && Math.abs(q+r)<=R;
+const neighbors = (q,r)=>DIRS.map(d=>[q+d[0],r+d[1]]).filter(c=>onBoard(c[0],c[1]));
+
+function sides(q,r){                       // bords du plateau touchés (0..5, opposés = i et i+3)
+  const x=q, z=r, y=-q-r, s=[];
+  if(x===R)s.push(0); if(z===-R)s.push(1); if(y===R)s.push(2);
+  if(x===-R)s.push(3); if(z===R)s.push(4); if(y===-R)s.push(5);
+  return s;
+}
+
+/* ---------- état ---------- */
+let board, hand, nextHand, history, sel, ghost, effects, cachedScore;
+let discards, closedAt, shownScore, finished, insp = null;
+let dust = [], deal = false;
+
+function drawTerrain(){
+  const tot = WEIGHTS.reduce((a,w)=>a+w[1],0);
+  let n = Math.random()*tot;
+  for(const [t,w] of WEIGHTS){ n-=w; if(n<=0) return t; }
+  return 'foret';
+}
+function drawTile(){
+  const terrain = drawTerrain();
+  const rares = Object.keys(RARES).filter(k=>RARES[k].on===terrain);
+  if(rares.length && Math.random()<RARE_CHANCE)
+    return {terrain, cmd:null, done:false, rare:rares[(Math.random()*rares.length)|0]};
+  const pool = Object.keys(COMMANDS).filter(k=>COMMANDS[k].on===terrain);
+  const cmd = (pool.length && Math.random()<0.32) ? pool[(Math.random()*pool.length)|0] : null;
+  return {terrain, cmd, done:false, rare:null};
+}
+const drawHand = ()=>[drawTile(),drawTile(),drawTile()];
+
+const dist = (a,b)=>(Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[0]+a[1]-b[0]-b[1]))/2;
+
+function seeds(){                              // 4 amorces dispersées : chaque partie démarre autrement
+  const out = [[0,0]];
+  const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=2 && d<=3; });
+  let guard = 0;
+  while(out.length<4 && guard++<400){
+    const c = pool[(Math.random()*pool.length)|0];
+    if(out.every(o=>dist(o,c)>=3)) out.push(c);
+  }
+  return out;
+}
+
+function newGame(){
+  board = new Map();
+  for(const [q,r] of seeds())
+    board.set(key(q,r), {terrain:drawTerrain(), cmd:null, done:false, rare:null});
+  hand = drawHand(); nextHand = drawHand(); deal = true;
+  history = []; sel = null; ghost = null; effects = []; dust = [];
+  discards = DISCARDS_MAX; closedAt = new Map();
+  finished = false; document.body.classList.remove('done'); hideInspect();
+  over.classList.remove('on');
+  el('sheet').classList.remove('on');
+  cachedScore = score(board);
+  syncClosed(true);
+  shownScore = cachedScore.total;
+  el('score').textContent = shownScore;
+  renderAll();
+}
+
+function syncClosed(instant){                  // aligne l'affichage des massifs fermés sur le score
+  const next = new Map();
+  for(const k of cachedScore.closed) next.set(k, closedAt.has(k) ? closedAt.get(k) : (instant?0:performance.now()));
+  closedAt = next;
+}
+
+/* ---------- score ---------- */
+function groups(b, pred){
+  const seen = new Set(), out = [];
+  for(const [k,c] of b){
+    if(seen.has(k) || !pred(c)) continue;
+    const g = [], stack = [k]; seen.add(k);
+    while(stack.length){
+      const cur = stack.pop(); g.push(cur);
+      const [q,r] = cur.split(',').map(Number);
+      for(const [nq,nr] of neighbors(q,r)){
+        const nk = key(nq,nr), nc = b.get(nk);
+        if(nc && !seen.has(nk) && nc.terrain===c.terrain){ seen.add(nk); stack.push(nk); }
+      }
+    }
+    out.push({terrain:c.terrain, cells:g});
+  }
+  return out;
+}
+function waterLinks(b,k){                      // voisines d'eau, plus l'enjambée du pont sur les 3 axes
+  const [q,r] = k.split(',').map(Number);
+  const out = [];
+  for(const [dq,dr] of DIRS){
+    const nk = key(q+dq,r+dr), nc = b.get(nk);
+    if(nc && nc.terrain==='eau') out.push(nk);
+    const jk = key(q+2*dq,r+2*dr), jc = b.get(jk);
+    if(jc && jc.terrain==='eau' && (b.get(k).rare==='pont' || jc.rare==='pont')) out.push(jk);
+  }
+  return out;
+}
+function waterGroups(b){
+  const seen = new Set(), out = [];
+  for(const [k,c] of b){
+    if(c.terrain!=='eau' || seen.has(k)) continue;
+    const g = [], st = [k]; seen.add(k);
+    while(st.length){ const cur = st.pop(); g.push(cur);
+      for(const nk of waterLinks(b,cur)) if(!seen.has(nk)){ seen.add(nk); st.push(nk); } }
+    out.push(g);
+  }
+  return out;
+}
+
+const isClosed = (b,g)=>g.cells.every(k=>{
+  const [q,r]=k.split(',').map(Number);
+  return neighbors(q,r).every(n=>b.has(key(n[0],n[1])));
+});
+
+function cmdOk(b,k,c){
+  if(!c.cmd) return false;
+  if(c.done) return true;
+  const [q,r] = k.split(',').map(Number);
+  const nb = neighbors(q,r).map(n=>b.get(key(n[0],n[1])));
+  const count = t=>nb.filter(x=>x&&x.terrain===t).length;
+  switch(c.cmd){
+    case 'village_forets3': return count('foret')>=3;
+    case 'village_eau':     return count('eau')>=2;
+    case 'champ_villages2': return count('village')>=2;
+    case 'pierre_isolee':   return nb.length===neighbors(q,r).length &&
+                                   neighbors(q,r).every(n=>b.has(key(n[0],n[1]))) && count('pierre')===0;
+    case 'foret_massif5': {
+      const seen=new Set([k]); const st=[k]; let n=0;
+      while(st.length){ const cur=st.pop(); n++;
+        const [cq,cr]=cur.split(',').map(Number);
+        for(const [nq,nr] of neighbors(cq,cr)){
+          const nk=key(nq,nr), nc=b.get(nk);
+          if(nc && nc.terrain==='foret' && !seen.has(nk)){ seen.add(nk); st.push(nk); }
+        }}
+      return n>=5;
+    }
+  }
+  return false;
+}
+
+function score(b){
+  let massifs=0, rivieres=0, villages=0, commandes=0;
+  const closed = new Set();
+  for(const g of groups(b, c=>['foret','champ','pierre'].includes(c.terrain))){
+    if(isClosed(b,g)){ massifs += g.cells.length*g.cells.length; g.cells.forEach(k=>closed.add(k)); }
+    else massifs += g.cells.length;
+  }
+  const glow = new Set();
+  for(const g of waterGroups(b)){
+    rivieres += 3*g.length;
+    const s = new Set(); g.forEach(k=>{const[q,r]=k.split(',').map(Number); sides(q,r).forEach(i=>s.add(i));});
+    if([...s].some(i=>s.has((i+3)%6))){ rivieres += 40; g.forEach(k=>glow.add(k)); }
+  }
+  for(const [k,c] of b){
+    if(c.terrain!=='village') continue;
+    const [q,r]=k.split(',').map(Number);
+    const nb = neighbors(q,r).map(n=>b.get(key(n[0],n[1]))).filter(Boolean);
+    const kinds = new Set(nb.map(x=>x.terrain));
+    let v = 2*kinds.size;
+    if(kinds.has('eau')) v*=2;
+    v += MOULIN_BONUS * nb.filter(x=>x.rare==='moulin').length;
+    villages += v;
+  }
+  for(const [k,c] of b) if(cmdOk(b,k,c)) commandes += CMD_BONUS;
+  return {massifs,rivieres,villages,commandes,closed,glow,
+          total:massifs+rivieres+villages+commandes};
+}
+
+/* ---------- son ---------- */
+const snd = {
+  on:true, ac:null,
+  ready(){
+    if(this.ac || typeof AudioContext==='undefined' && typeof webkitAudioContext==='undefined') return this.ac;
+    const AC = typeof AudioContext!=='undefined' ? AudioContext : webkitAudioContext;
+    try{ this.ac = new AC(); }catch(e){ this.ac = null; }
+    return this.ac;
+  },
+  env(when,dur,peak){
+    const g = this.ac.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(peak, when+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, when+dur);
+    g.connect(this.ac.destination);
+    return g;
+  },
+  tone(freq,when,dur,peak,type){
+    const o = this.ac.createOscillator();
+    o.type = type||'sine'; o.frequency.setValueAtTime(freq, when);
+    o.connect(this.env(when,dur,peak)); o.start(when); o.stop(when+dur+0.05);
+    return o;
+  },
+  clac(){                                     // pose : bois mat, hauteur qui retombe
+    if(!this.on || !this.ready()) return;
+    const t = this.ac.currentTime;
+    const o = this.tone(210,t,0.09,0.16,'triangle');
+    o.frequency.exponentialRampToValueAtTime(105, t+0.08);
+    this.tone(1400,t,0.03,0.05,'square');
+  },
+  carillon(i,total,delay){                    // fermeture : une note par tuile, montante
+    if(!this.on || !this.ready()) return;
+    const scale = [523.25,587.33,659.25,783.99,880,1046.5,1174.7,1318.5];
+    const f = scale[Math.min(i,scale.length-1)];
+    const t = this.ac.currentTime + delay;
+    this.tone(f,t,0.55,0.09,'sine');
+    if(i===total-1) this.tone(f*1.5,t,0.8,0.05,'sine');
+  },
+  defausse(){
+    if(!this.on || !this.ready()) return;
+    const t = this.ac.currentTime;
+    const o = this.tone(320,t,0.18,0.08,'sawtooth');
+    o.frequency.exponentialRampToValueAtTime(120, t+0.17);
+  }
+};
+function buzz(ms){ try{ if(typeof navigator!=='undefined' && navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
+/* ---------- rendu plateau ---------- */
+const cv = document.getElementById('board');
+let ctx = cv.getContext('2d');
+const mainCtx = ctx;
+let S = 22, OX = 0, OY = 0;
+
+function layout(){
+  const w = cv.clientWidth;
+  S = w / (Math.sqrt(3)*(2*R+1.35));
+  const h = Math.ceil(S*1.5*2*R + S*2.6);
+  cv.style.height = h+'px';
+  const dpr = Math.min(devicePixelRatio||1, 2.5);
+  cv.width = w*dpr; cv.height = h*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  OX = w/2; OY = h/2;
+  buildLightPath();
+}
+const px = (q,r)=>[OX + S*Math.sqrt(3)*(q + r/2), OY + S*1.5*r];
+
+function hexAt(mx,my){
+  const x = (mx-OX)/S, y = (my-OY)/S;
+  const qf = (Math.sqrt(3)/3*x - y/3), rf = (2/3*y);
+  let xc=qf, zc=rf, yc=-xc-zc;
+  let rx=Math.round(xc), ry=Math.round(yc), rz=Math.round(zc);
+  const dx=Math.abs(rx-xc), dy=Math.abs(ry-yc), dz=Math.abs(rz-zc);
+  if(dx>dy&&dx>dz) rx=-ry-rz; else if(dy>dz) ry=-rx-rz; else rz=-rx-ry;
+  return onBoard(rx,rz) ? [rx,rz] : null;
+}
+
+function hexPath(x,y,s){
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const a=Math.PI/180*(60*i-30);
+    const vx=x+s*Math.cos(a), vy=y+s*Math.sin(a);
+    i?ctx.lineTo(vx,vy):ctx.moveTo(vx,vy);
+  }
+  ctx.closePath();
+}
+
+function motif(t,x,y,s){
+  const T = TERRAINS[t];
+  ctx.save();
+  if(t==='foret'){
+    ctx.fillStyle=T.dark;
+    const ph = REDUCED ? 0 : performance.now()/1300 + (x*.7+y*.3)*.05;
+    [[-.34,.12],[.02,-.22],[.34,.14]].forEach(([ox,oy],i)=>{
+      const h=s*(i===1?.52:.44), w=s*.26, cx=x+ox*s, cy=y+oy*s+h*.3;
+      const tilt = Math.sin(ph + i*1.7)*s*.055;      // la cime penche, le pied reste planté
+      ctx.beginPath(); ctx.moveTo(cx+tilt,cy-h); ctx.lineTo(cx+w,cy); ctx.lineTo(cx-w,cy); ctx.closePath(); ctx.fill();
+    });
+  } else if(t==='champ'){
+    ctx.strokeStyle=T.dark; ctx.lineWidth=Math.max(1,s*.075); ctx.lineCap='round';
+    for(let i=-1;i<=1;i++){ const oy=y+i*s*.34;
+      ctx.beginPath(); ctx.moveTo(x-s*.45,oy); ctx.lineTo(x+s*.45,oy); ctx.stroke(); }
+  } else if(t==='eau'){
+    const ph = REDUCED ? 0 : (performance.now()/620 + (x+y)*0.06);
+    ctx.strokeStyle=T.light; ctx.lineWidth=Math.max(1,s*.09); ctx.lineCap='round';
+    for(let i=-1;i<=1;i+=2){
+      const oy = y + i*s*.2 + Math.sin(ph + i)*s*.055;
+      ctx.beginPath(); ctx.moveTo(x-s*.4,oy);
+      ctx.quadraticCurveTo(x+Math.sin(ph+i)*s*.12, oy-s*.22, x+s*.4, oy); ctx.stroke(); }
+  } else if(t==='pierre'){
+    ctx.fillStyle=T.dark;
+    [[-.24,.14,.3],[.2,-.02,.36],[.06,.3,.2]].forEach(([ox,oy,rr])=>{
+      ctx.beginPath(); ctx.arc(x+ox*s,y+oy*s,s*rr,0,7); ctx.fill(); });
+  } else if(t==='village'){
+    ctx.fillStyle=T.dark;
+    [[-.26,.1,.30],[.22,-.05,.36]].forEach(([ox,oy,sc])=>{
+      const w=s*sc, cx=x+ox*s, cy=y+oy*s;
+      ctx.fillRect(cx-w/2,cy,w,w*.8);
+      ctx.beginPath(); ctx.moveTo(cx-w*.68,cy); ctx.lineTo(cx,cy-w*.7); ctx.lineTo(cx+w*.68,cy);
+      ctx.closePath(); ctx.fill(); });
+  }
+  ctx.restore();
+}
+
+function rareMotif(rare,x,y,s){
+  ctx.save();
+  if(rare==='pont'){                          // arche de pierre en travers de l'eau
+    ctx.strokeStyle='#cbbfa6'; ctx.lineWidth=Math.max(1.4,s*.14); ctx.lineCap='butt';
+    ctx.beginPath(); ctx.moveTo(x-s*.62,y+s*.1);
+    ctx.quadraticCurveTo(x, y-s*.5, x+s*.62, y+s*.1); ctx.stroke();
+    ctx.fillStyle='#9d907a';
+    ctx.fillRect(x-s*.66,y+s*.06,s*.16,s*.3); ctx.fillRect(x+s*.5,y+s*.06,s*.16,s*.3);
+  } else if(rare==='moulin'){                 // moulin : mât et quatre ailes
+    ctx.strokeStyle='#5a4520'; ctx.lineWidth=Math.max(1.2,s*.11);
+    ctx.beginPath(); ctx.moveTo(x,y+s*.42); ctx.lineTo(x,y-s*.18); ctx.stroke();
+    ctx.strokeStyle='#f0e2bd'; ctx.lineWidth=Math.max(1,s*.09);
+    const a0 = REDUCED ? 0.6 : performance.now()/900;
+    for(let i=0;i<4;i++){ const a=a0+i*Math.PI/2;
+      ctx.beginPath(); ctx.moveTo(x,y-s*.18);
+      ctx.lineTo(x+Math.cos(a)*s*.42, y-s*.18+Math.sin(a)*s*.42); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+function paintTile(t,x,y,s,opts={}){
+  const T = TERRAINS[t];
+  hexPath(x,y,s*.955);
+  ctx.fillStyle = T.fill; ctx.fill();
+  if(opts.closed){ ctx.save(); ctx.globalAlpha=.5; ctx.fillStyle=T.light; ctx.fill(); ctx.restore(); }
+  if(opts.flash){ ctx.save(); ctx.globalAlpha=opts.flash*.55; ctx.fillStyle='#fff6df'; ctx.fill(); ctx.restore(); }
+  motif(t,x,y,s);
+  if(opts.rare) rareMotif(opts.rare,x,y,s);
+  if(opts.glow){
+    ctx.save(); ctx.globalAlpha=.5+.3*Math.sin(performance.now()/420);
+    ctx.strokeStyle='#8fe3f0'; ctx.lineWidth=Math.max(1.4,s*.1);
+    hexPath(x,y,s*.7); ctx.stroke(); ctx.restore();
+  }
+  ctx.lineWidth = opts.closed ? Math.max(1.5,s*.11) : Math.max(1,s*.05);
+  ctx.strokeStyle = opts.closed ? '#d9a441' : (opts.rare ? '#e8d5a3' : T.dark);
+  hexPath(x,y,s*.955); ctx.stroke();
+}
+
+function cmdMark(c,x,y,s){
+  if(!c.cmd) return;
+  ctx.save();
+  if(c.done){
+    ctx.fillStyle='#d9a441'; ctx.beginPath(); ctx.arc(x,y-s*.58,s*.15,0,7); ctx.fill();
+  } else {
+    ctx.strokeStyle='#d9a441'; ctx.lineWidth=Math.max(1,s*.07);
+    ctx.setLineDash([s*.22,s*.18]); hexPath(x,y,s*.66); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const DUST_MAX = 30;
+function spawnDust(q,r){                         // six grains ocre qui retombent sous la tuile
+  if(REDUCED) return;
+  const [x,y] = px(q,r), now = performance.now();
+  for(let i=0;i<6;i++) dust.push({
+    x: x + (Math.random()-.5)*S*.7, y: y + S*.15,
+    vx: (Math.random()-.5)*S*.055, vy: -S*(.012 + Math.random()*.05),
+    r: S*(.045 + Math.random()*.05), t: now, life: 520 + Math.random()*260
+  });
+  if(dust.length>DUST_MAX) dust.splice(0, dust.length-DUST_MAX);
+}
+function drawDust(now){
+  if(!dust.length) return;
+  dust = dust.filter(d=>now-d.t < d.life);
+  ctx.save(); ctx.fillStyle='#d9b478';
+  for(const d of dust){
+    const e = now-d.t, f = e/16.67, p = e/d.life;
+    const x = d.x + d.vx*f, y = d.y + d.vy*f + .5*(S*.0045)*f*f;
+    ctx.globalAlpha = (1-p)*.75;
+    ctx.beginPath(); ctx.arc(x, y, d.r*(1-p*.4), 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+const SMOKE_T = 4800;                            // une volute toutes les 4,8 s par village
+function smoke(x,y,s,q,r,alpha){
+  if(REDUCED) return;
+  const base = ((q*7 + r*13) % 10 + 10) % 10 / 10 * SMOKE_T;
+  const now = performance.now();
+  ctx.save(); ctx.fillStyle='#cbd6d1';
+  for(let i=0;i<3;i++){
+    const p = ((now + base + i*SMOKE_T/3) % SMOKE_T) / SMOKE_T;
+    if(p>0.78) continue;
+    const k = p/0.78;
+    const px2 = x + s*.22 + Math.sin(k*3.1 + i)*s*.16;
+    const py2 = y - s*.28 - k*s*1.15;
+    ctx.globalAlpha = alpha * 0.30 * (1-k) * Math.min(1,k*5);
+    ctx.beginPath(); ctx.arc(px2, py2, s*(.09 + k*.20), 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+const LIGHT_T = 30000;                           // durée d'une traversée du nuage
+let lightPath = null;
+function buildLightPath(){                       // la lumière ne passe que sur le pays posé
+  if(typeof Path2D==='undefined'){ lightPath = null; return; }
+  const p = new Path2D();
+  for(const [q,r] of cells){
+    if(!board || !board.has(key(q,r))) continue;
+    const [x,y] = px(q,r);
+    for(let i=0;i<6;i++){
+      const a=Math.PI/180*(60*i-30), vx=x+S*.955*Math.cos(a), vy=y+S*.955*Math.sin(a);
+      i?p.lineTo(vx,vy):p.moveTo(vx,vy);
+    }
+    p.closePath();
+  }
+  lightPath = p;
+}
+
+function passingLight(now){                      // nuage : une ombre douce, puis une trainée chaude
+  if(REDUCED || !lightPath) return;
+  const w = cv.clientWidth, h = parseFloat(cv.style.height) || w;
+  const span = w + h;
+  const t = (now % LIGHT_T) / LIGHT_T;
+  const c = -span*0.6 + t*span*2.2;              // position de la bande sur la diagonale
+  ctx.save(); ctx.clip(lightPath);
+  const mk = (offset,color,peak)=>{
+    const a = c + offset;
+    const g = ctx.createLinearGradient(a - span*.34, -span*.34, a + span*.34, span*.34);
+    g.addColorStop(0,   color.replace('A','0'));
+    g.addColorStop(0.5, color.replace('A',String(peak)));
+    g.addColorStop(1,   color.replace('A','0'));
+    return g;
+  };
+  ctx.fillStyle = mk(-span*0.22, 'rgba(4,16,20,A)', 0.16);
+  ctx.fillRect(0,0,w,h);
+  ctx.globalCompositeOperation='lighter';
+  ctx.fillStyle = mk(0, 'rgba(255,214,150,A)', 0.055);
+  ctx.fillRect(0,0,w,h);
+  ctx.restore();
+}
+
+function render(){
+  const now = performance.now();
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const doneCmds = new Set();
+  for(const [k,c] of board) if(cmdOk(board,k,c)) doneCmds.add(k);
+
+  const targets = ghost ? null : validTargets();
+  const puffs = [];
+  for(const [q,r] of cells){
+    const k = key(q,r), [x,y] = px(q,r), c = board.get(k);
+    if(c){
+      const e = effects.find(e=>e.k===k && e.type==='pop');
+      const grow = e ? Math.min(1,(now-e.t)/220) : 1;
+      const j = effects.find(e=>e.k===k && e.type==='jolt');
+      let jolt = 1;
+      if(j && !REDUCED){                          // la voisine encaisse la pose : 2 % puis retour
+        const jp = (now-j.t)/260;
+        if(jp>0 && jp<1) jolt = 1 - .02*Math.sin(jp*Math.PI);
+      }
+      const s = S*jolt*(REDUCED?1:(0.72+0.28*(1-Math.pow(1-grow,3))));
+      const dim = insp && !insp.set.has(k);
+      if(dim) ctx.save(), ctx.globalAlpha = 0.3;
+      if(cachedScore.closed.has(k) && !closedAt.has(k)) closedAt.set(k, now);
+      const ct = closedAt.get(k);
+      const shut = ct!==undefined && now>=ct;
+      const flash = shut && !REDUCED ? Math.max(0, 1-(now-ct)/320) : 0;
+      paintTile(c.terrain,x,y,s,{closed:shut, flash, rare:c.rare, glow:cachedScore.glow.has(k)});
+      cmdMark({cmd:c.cmd,done:doneCmds.has(k)},x,y,S);
+      if(c.terrain==='village') puffs.push([x,y,q,r,dim?0.3:1]);
+      if(dim) ctx.restore();
+      if(insp && insp.k===k){
+        ctx.lineWidth=Math.max(1.6,S*.11); ctx.strokeStyle='#f0d089';
+        hexPath(x,y,S*.955); ctx.stroke();
+      }
+    } else {
+      hexPath(x,y,S*.955);
+      ctx.fillStyle='#132728'; ctx.fill();
+      const ok = sel!==null && targets && targets.has(k);
+      const cible = insp && insp.set.has(k);
+      ctx.lineWidth = cible ? 1.4 : 1;
+      ctx.strokeStyle = cible ? 'rgba(240,208,137,.5)' : (ok ? 'rgba(217,164,65,.55)' : '#1c3739');
+      ctx.stroke();
+    }
+  }
+  for(const [x,y,q,r,a] of puffs) smoke(x,y,S,q,r,a);
+  drawDust(now);
+  passingLight(now);
+
+  if(ghost){
+    const [x,y] = px(ghost[0],ghost[1]);
+    ctx.save(); ctx.globalAlpha = REDUCED?.85:(.62+.18*Math.sin(now/280));
+    paintTile(hand[sel].terrain,x,y,S,{rare:hand[sel].rare});
+    ctx.restore();
+    ctx.lineWidth=Math.max(1.6,S*.1); ctx.strokeStyle='#d9a441';
+    hexPath(x,y,S*.955); ctx.stroke();
+  }
+  effects = effects.filter(e=>now-e.t < (e.type==='float'?1100:400));
+  for(const e of effects){
+    if(e.type!=='float') continue;
+    const p=(now-e.t)/1100, [x,y]=px(e.q,e.r);
+    ctx.save(); ctx.globalAlpha=1-p*p;
+    ctx.fillStyle='#d9a441'; ctx.font='600 '+(S*.95)+'px Fraunces, serif';
+    ctx.textAlign='center'; ctx.fillText('+'+e.n, x, y-S*.6-p*S*1.6); ctx.restore();
+  }
+  const target = cachedScore.total;
+  if(shownScore !== target){
+    const d = target - shownScore;
+    shownScore = REDUCED || Math.abs(d)<1 ? target : shownScore + d*0.12;
+    const v = Math.abs(target-shownScore)<0.5 ? target : Math.round(shownScore);
+    if(v===target) shownScore = target;
+    el('score').textContent = v;
+  }
+  requestAnimationFrame(render);
+}
+
+function validTargets(){
+  const s = new Set();
+  for(const [q,r] of cells){
+    const k = key(q,r);
+    if(board.has(k)) continue;
+    if(neighbors(q,r).some(n=>board.has(key(n[0],n[1])))) s.add(k);
+  }
+  return s;
+}
+
+/* ---------- inspection d'une tuile ---------- */
+const pts = n=>n+(n>1?' pts':' pt');
+
+function groupOf(b,k){
+  const t = b.get(k).terrain, seen = new Set([k]), st = [k], out = [];
+  while(st.length){ const cur = st.pop(); out.push(cur);
+    const [q,r] = cur.split(',').map(Number);
+    for(const [nq,nr] of neighbors(q,r)){
+      const nk = key(nq,nr), nc = b.get(nk);
+      if(nc && nc.terrain===t && !seen.has(nk)){ seen.add(nk); st.push(nk); }
+    }}
+  return out;
+}
+const freeAround = ks=>{
+  const f = new Set();
+  ks.forEach(x=>{ const [q,r] = x.split(',').map(Number);
+    neighbors(q,r).forEach(n=>{ const nk = key(n[0],n[1]); if(!board.has(nk)) f.add(nk); }); });
+  return f;
+};
+
+function cmdRow(k,c){
+  if(!c.cmd) return null;
+  const [q,r] = k.split(',').map(Number);
+  const nb = neighbors(q,r).map(n=>board.get(key(n[0],n[1])));
+  const count = t=>nb.filter(x=>x&&x.terrain===t).length;
+  const label = 'Commande — '+COMMANDS[c.cmd].text;
+  if(cmdOk(board,k,c)) return [label, CMD_BONUS+' pts acquis'];
+  // sinon on montre l'avancement
+  let state;
+  switch(c.cmd){
+    case 'village_forets3': state = count('foret')+'/3'; break;
+    case 'village_eau':     state = count('eau')+'/2'; break;
+    case 'champ_villages2': state = count('village')+'/2'; break;
+    case 'foret_massif5':   state = groupOf(board,k).length+'/5'; break;
+    case 'pierre_isolee': {
+      const libres = neighbors(q,r).filter(n=>!board.has(key(n[0],n[1]))).length;
+      state = count('pierre') ? 'perdue' : (libres+' case'+(libres>1?'s':'')+' à remplir');
+      break; }
+  }
+  return [label, state+' · '+CMD_BONUS+' pts', true];
+}
+
+function inspectData(k){
+  const c = board.get(k), [q,r] = k.split(',').map(Number);
+  const set = new Set([k]), rows = [];
+  let title = TERRAINS[c.terrain].name, rule = '';
+
+  if(['foret','champ','pierre'].includes(c.terrain)){
+    const g = groupOf(board,k); g.forEach(x=>set.add(x));
+    const free = freeAround(g); free.forEach(x=>set.add(x));
+    const n = g.length;
+    if(free.size){
+      rows.push(['Massif ouvert de '+n, pts(n)+' pour l’instant']);
+      rows.push(['S’il se ferme tel quel', pts(n*n), true]);
+      rows.push(['Avec une case de plus', pts((n+1)*(n+1)), true]);
+      rows.push(['Cases libres autour', free.size, true]);
+    } else {
+      rows.push(['Massif fermé de '+n, pts(n*n)+' acquis']);
+    }
+    rule = 'Un massif vaut sa taille tant qu’il est ouvert, sa taille au carré une fois entièrement entouré.';
+  }
+
+  if(c.terrain==='eau'){
+    const g = waterGroups(board).find(gr=>gr.includes(k)) || [k];
+    g.forEach(x=>set.add(x));
+    const sd = new Set(); g.forEach(x=>{const[a,b]=x.split(',').map(Number); sides(a,b).forEach(i=>sd.add(i));});
+    const cross = [...sd].some(i=>sd.has((i+3)%6));
+    rows.push(['Rivière de '+g.length, pts(3*g.length)]);
+    rows.push(['Une case de plus', '+3 pts', true]);
+    rows.push(cross ? ['Traversée du plateau', '+40 acquis']
+                    : ['Traversée du plateau', sd.size ? '+40 si elle atteint le bord opposé' : '+40 de bord à bord', true]);
+    rule = 'Un pont enjambe une case et raccorde deux tronçons séparés.';
+  }
+
+  if(c.terrain==='village'){
+    const nbk = neighbors(q,r).map(n=>key(n[0],n[1]));
+    nbk.forEach(x=>set.add(x));
+    const nb = nbk.map(x=>board.get(x)).filter(Boolean);
+    const kinds = new Set(nb.map(x=>x.terrain));
+    const libres = nbk.filter(x=>!board.has(x)).length;
+    const moulins = nb.filter(x=>x.rare==='moulin').length;
+    const eau = kinds.has('eau');
+    const val = 2*kinds.size*(eau?2:1) + MOULIN_BONUS*moulins;
+    const maxK = Math.min(5, kinds.size + libres);
+    const pot = 2*maxK*((eau||libres)?2:1) + MOULIN_BONUS*moulins;
+    rows.push([kinds.size+' terrain'+(kinds.size>1?'s':'')+' différent'+(kinds.size>1?'s':'')+' autour', pts(val)]);
+    rows.push(['Bonus eau', eau ? '×2 acquis' : (libres?'×2 si une eau le touche':'hors d’atteinte'), !eau]);
+    if(moulins) rows.push(['Moulin voisin', '+'+pts(MOULIN_BONUS*moulins)]);
+    if(libres) rows.push(['Cases libres autour', libres+' → jusqu’à '+pts(pot), true]);
+    rule = 'Le village veut de la variété : il tire dans le sens inverse des massifs.';
+  }
+
+  const cr = cmdRow(k,c);
+  if(cr) rows.push(cr);
+  if(c.rare){ title += ' · '+RARES[c.rare].name; rule = RARES[c.rare].name+' — '+RARES[c.rare].hint+'.'; }
+  return {title, rows, set, rule};
+}
+
+function showInspect(k){
+  const d = inspectData(k);
+  insp = {k, set:d.set};
+  el('insp-t').textContent = d.title;
+  el('insp-b').innerHTML = d.rows.map(([a,b,dim])=>
+    '<div class="l'+(dim?' dim':'')+'"><span>'+a+'</span><span>'+b+'</span></div>').join('')
+    + (d.rule?'<div class="rule">'+d.rule+'</div>':'');
+  el('insp').classList.add('on');
+}
+function hideInspect(){ insp = null; el('insp').classList.remove('on'); }
+
+/* ---------- interaction ---------- */
+const el = id=>document.getElementById(id);
+const over = el('over');
+
+cv.addEventListener('click', ev=>{
+  if(finished) over.classList.remove('on');
+  const rect = cv.getBoundingClientRect();
+  const h = hexAt(ev.clientX-rect.left, ev.clientY-rect.top);
+  if(!h){ hideInspect(); return; }
+  const k = key(h[0],h[1]);
+  if(board.has(k)){                            // tuile posée : on détaille ce qu'elle rapporte
+    if(insp && insp.k===k) hideInspect(); else showInspect(k);
+    return; }
+  hideInspect();
+  if(finished || sel===null){
+    if(!finished) el('hint').textContent='Choisis une tuile.';
+    return; }
+  if(!validTargets().has(k)) { el('hint').textContent='Il faut poser à côté du pays existant.'; return; }
+  if(ghost && ghost[0]===h[0] && ghost[1]===h[1]) return commit();
+  ghost = h; refreshDelta();
+});
+
+function refreshDelta(){
+  el('place').disabled = !ghost;
+  if(!ghost){ el('delta').textContent=''; return; }
+  const test = new Map(board);
+  test.set(key(ghost[0],ghost[1]), {...hand[sel]});
+  const d = score(test).total - cachedScore.total;
+  const dd = el('delta');
+  dd.textContent = (d>=0?'+':'')+d;
+  dd.className = 'delta'+(d===0?' zero':'');
+  el('hint').textContent = 'Retape la case, ou choisis la tuile suivante.';
+}
+
+function snapshot(){
+  history.push({board:new Map([...board].map(([k,v])=>[k,{...v}])),
+                hand:hand.map(t=>t&&{...t}), nextHand:nextHand.map(t=>({...t})), discards});
+  if(history.length>40) history.shift();
+}
+
+const STEP = 75;                              // décalage entre deux tuiles d'une même fermeture
+
+function cascade(k){                          // révèle le massif fermé depuis la tuile posée
+  const now = performance.now();
+  const fresh = [...cachedScore.closed].filter(c=>!closedAt.has(c));
+  if(!fresh.length) return;
+  const set = new Set(fresh);
+  let ordered = [], seen = new Set();
+  const start = set.has(k) ? [k] : [fresh[0]];
+  const queue = start.slice(); start.forEach(x=>seen.add(x));
+  while(queue.length){                        // parcours en largeur : l'onde part du centre
+    const cur = queue.shift(); ordered.push(cur);
+    const [q,r] = cur.split(',').map(Number);
+    for(const [nq,nr] of neighbors(q,r)){
+      const nk = key(nq,nr);
+      if(set.has(nk) && !seen.has(nk)){ seen.add(nk); queue.push(nk); }
+    }
+    if(!queue.length){                        // autre massif fermé au même coup
+      const next = fresh.find(x=>!seen.has(x));
+      if(next){ seen.add(next); queue.push(next); }
+    }
+  }
+  ordered.forEach((c,i)=>{
+    closedAt.set(c, now + i*STEP);
+    snd.carillon(i, ordered.length, i*STEP/1000);
+  });
+  buzz([0,8,60,14]);
+}
+
+function commit(){
+  if(!ghost || sel===null) return;
+  snapshot();
+  const k = key(ghost[0],ghost[1]);
+  const tile = {...hand[sel]};
+  board.set(k, tile);
+  const before = cachedScore.total;
+  cachedScore = score(board);
+  for(const [bk,c] of board) if(c.cmd && !c.done && cmdOk(board,bk,c)) c.done = true;
+  const gain = cachedScore.total - before;
+  effects.push({type:'pop',k,t:performance.now()});
+  if(gain!==0) effects.push({type:'float',q:ghost[0],r:ghost[1],n:gain,t:performance.now()});
+  snd.clac(); buzz(8); hideInspect();
+  spawnDust(ghost[0],ghost[1]);
+  for(const [nq,nr] of neighbors(ghost[0],ghost[1])){
+    const nk = key(nq,nr);
+    if(board.has(nk)) effects.push({type:'jolt', k:nk, t:performance.now()+40});
+  }
+  cascade(k);
+  syncClosed(false);
+  hand[sel] = null; ghost = null; sel = null;
+  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(); deal = true; }
+  renderAll();
+  if([...cells].every(([q,r])=>board.has(key(q,r)))) finish();
+}
+
+function discard(){
+  if(sel===null || discards<=0 || !hand[sel]) return;
+  snapshot();
+  discards--;
+  hand[sel] = null; ghost = null; sel = null;
+  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(); deal = true; }
+  snd.defausse(); buzz(6);
+  el('hint').textContent = discards ? 'Tuile écartée. Il t\u2019en reste '+discards+'.' : 'Tuile écartée. C\u2019était la dernière.';
+  renderAll();
+}
+
+function finish(){
+  finished = true;
+  sel = null; ghost = null;
+  document.body.classList.add('done');
+  el('hint').textContent = 'Le pays est complet.';
+  const s = cachedScore;
+  el('breakdown').innerHTML =
+    row('Massifs fermés', s.massifs) + row('Rivières', s.rivieres) +
+    row('Villages', s.villages) + row('Commandes', s.commandes) +
+    '<div class="row tot"><span>Total</span><span>'+s.total+'</span></div>';
+  // on laisse la dernière cascade se terminer avant de recouvrir le plateau
+  const last = Math.max(performance.now(), ...closedAt.values());
+  setTimeout(showScore, Math.min(2600, last - performance.now() + 900));
+}
+function showScore(){ over.classList.add('on'); over.classList.remove('fade'); void over.offsetWidth; over.classList.add('fade'); }
+const row = (a,b)=>'<div class="row"><span>'+a+'</span><span>'+b+'</span></div>';
+
+/* ---------- rendu UI ---------- */
+function renderHand(){
+  const wrap = el('hand'); wrap.innerHTML='';
+  hand.forEach((tile,i)=>{
+    const d = document.createElement('div');
+    d.className = 'slot' + (tile?'':' used') + (sel===i?' on':'') + (deal&&tile?' deal':'');
+    if(deal && tile) d.style.animationDelay = (i*60)+'ms';
+    const c = document.createElement('canvas');
+    const cap = document.createElement('div');
+    cap.className = 'cmd' + (tile&&tile.rare ? ' rare' : (tile&&tile.cmd?'':' none'));
+    cap.textContent = tile ? (tile.rare ? RARES[tile.rare].name+' — '+RARES[tile.rare].hint
+                            : (tile.cmd?COMMANDS[tile.cmd].text:TERRAINS[tile.terrain].name)) : '';
+    d.appendChild(c); d.appendChild(cap); wrap.appendChild(d);
+    if(tile) paintMini(c, tile, 24);
+    d.addEventListener('click',()=>{
+      if(!tile || finished) return;
+      hideInspect();
+      if(ghost && sel!==null && sel!==i){   // une pose est en attente : on la valide et on enchaîne
+        commit();
+        sel = i;
+        el('hint').textContent = 'Touche une case libre.';
+        renderHand(); refreshDelta();
+        return;
+      }
+      sel = (sel===i?null:i); ghost=null; refreshDelta();
+      el('hint').textContent = sel===null ? 'Choisis une tuile.' : 'Touche une case libre.';
+      renderHand();
+    });
+  });
+  deal = false;                                  // la distribution ne s'anime qu'une fois
+  const nr = el('nextrow'); nr.innerHTML='';
+  nextHand.forEach(t=>{ const c=document.createElement('canvas'); nr.appendChild(c); paintMini(c,t,10); });
+}
+
+function paintMini(canvas, tile, size){
+  const c = canvas.getContext('2d');
+  const dpr = Math.min(devicePixelRatio||1,2.5);
+  const w = canvas.clientWidth||52, h = canvas.clientHeight||60;
+  canvas.width=w*dpr; canvas.height=h*dpr;
+  c.setTransform(dpr,0,0,dpr,0,0);
+  const keep = ctx; ctx = c;                    // les routines de dessin écrivent dans ctx
+  paintTile(tile.terrain, w/2, h/2, size, {rare:tile.rare});
+  cmdMark(tile, w/2, h/2, size);
+  ctx = keep;
+}
+
+function renderAll(){
+  buildLightPath();
+  el('undo').disabled = history.length===0;
+  el('place').disabled = !ghost;
+  el('discard').disabled = sel===null || discards<=0;
+  el('dleft').textContent = discards;
+  renderHand();
+  refreshDelta();
+}
+
+el('place').addEventListener('click', commit);
+el('undo').addEventListener('click', ()=>{
+  const h = history.pop(); if(!h) return;
+  board = h.board; hand = h.hand; nextHand = h.nextHand; discards = h.discards;
+  sel=null; ghost=null; effects=[]; dust=[]; cachedScore = score(board);
+  closedAt = new Map(); syncClosed(true); hideInspect();
+  shownScore = cachedScore.total; el('score').textContent = shownScore;
+  over.classList.remove('on');
+  el('hint').textContent='Coup annulé.';
+  renderAll();
+});
+el('discard').addEventListener('click', discard);
+el('sound').addEventListener('click', ()=>{
+  snd.on = !snd.on;
+  el('sound').textContent = snd.on ? 'Son' : 'Muet';
+  if(snd.on){ snd.ready(); snd.clac(); }
+});
+el('reset').addEventListener('click', newGame);
+el('rules').addEventListener('click', ()=>el('sheet').classList.add('on'));
+el('closesheet').addEventListener('click', ()=>el('sheet').classList.remove('on'));
+el('again').addEventListener('click', newGame);
+el('again2').addEventListener('click', newGame);
+el('seeboard').addEventListener('click', ()=>over.classList.remove('on'));
+el('seescore').addEventListener('click', showScore);
+el('insp-x').addEventListener('click', hideInspect);
+addEventListener('resize', ()=>{ layout(); });
+
+addEventListener('pointerdown', ()=>snd.ready(), {once:true});
+layout(); newGame(); render();
+</script>
+</body>
+</html>
