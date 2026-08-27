@@ -241,6 +241,7 @@ import {
 import { createRng } from './src/rules/rng.js';
 import { key, buildCells, onBoard as _onBoard, neighbors as _neighbors, sides as _sides, dist } from './src/rules/geometry.js';
 import { groups as _groups, isClosed as _isClosed, waterGroups } from './src/rules/groups.js';
+import { cmdOk as _cmdOk } from './src/rules/commands.js';
 
 let rng;                         // générateur seedé, initialisé au câblage (bas du script)
 let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
@@ -376,31 +377,7 @@ function syncClosed(instant){                  // aligne l'affichage des massifs
 const groups = (b,pred)=>_groups(b,pred,R);       // wrappers liant le rayon courant
 const isClosed = (b,g)=>_isClosed(b,g,R);
 
-function cmdOk(b,k,c){
-  if(!c.cmd) return false;
-  if(c.done) return true;
-  const [q,r] = k.split(',').map(Number);
-  const nb = neighbors(q,r).map(n=>b.get(key(n[0],n[1])));
-  const count = t=>nb.filter(x=>x&&x.terrain===t).length;
-  switch(c.cmd){
-    case 'village_forets3': return count('foret')>=CMD_FORETS3;
-    case 'village_eau':     return count('eau')>=CMD_EAU2;
-    case 'champ_villages2': return count('village')>=CMD_VILLAGES2;
-    case 'pierre_isolee':   return nb.length===neighbors(q,r).length &&
-                                   neighbors(q,r).every(n=>b.has(key(n[0],n[1]))) && count('pierre')===0;
-    case 'foret_massif5': {
-      const seen=new Set([k]); const st=[k]; let n=0;
-      while(st.length){ const cur=st.pop(); n++;
-        const [cq,cr]=cur.split(',').map(Number);
-        for(const [nq,nr] of neighbors(cq,cr)){
-          const nk=key(nq,nr), nc=b.get(nk);
-          if(nc && nc.terrain==='foret' && !seen.has(nk)){ seen.add(nk); st.push(nk); }
-        }}
-      return n>=CMD_MASSIF5;
-    }
-  }
-  return false;
-}
+const cmdOk = (b,k,c)=>_cmdOk(b,k,c,R);           // wrapper liant le rayon courant
 
 function score(b){
   let massifs=0, rivieres=0, villages=0, commandes=0;
