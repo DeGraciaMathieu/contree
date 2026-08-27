@@ -232,9 +232,9 @@
 import {
   R_LONG, R_SHORT, CROSS_FACTOR, DIRS, TERRAINS, WEIGHTS, CMD_CHANCE, RARE_CHANCE,
   COMMANDS, CMD_BONUS, CMD_FORETS3, CMD_EAU2, CMD_VILLAGES2, CMD_MASSIF5,
-  RARES, MOULIN_BONUS, RIVER_PT, VILLAGE_PT, VILLAGE_WATER_MULT, MASSIF_T, MASSIF_MIN,
+  RARES, MOULIN_BONUS, RIVER_PT, VILLAGE_PT, VILLAGE_WATER_MULT, MASSIF_T,
   DISCARDS_MAX, HISTORY_MAX, SEED_COUNT, SEED_RING_MIN, SEED_RING_MAX, SEED_SPACING,
-  GOAL_BONUS, GOAL_FERMER, GOAL_GROS, GOAL_COMMANDES, GOAL_TOT_LIMIT, GOAL_ISOLES,
+  GOAL_BONUS,
   STEP, DUST_MAX, SMOKE_T, LIGHT_T, SCORE_INTERP, FINISH_CAP, FINISH_MARGIN,
   TOP_N, LS_FMT, LS_KEY,
 } from './src/config.js';
@@ -242,6 +242,7 @@ import { createRng } from './src/rules/rng.js';
 import { key, buildCells, onBoard as _onBoard, neighbors as _neighbors, sides as _sides, dist } from './src/rules/geometry.js';
 import { groups as _groups, isClosed as _isClosed, waterGroups } from './src/rules/groups.js';
 import { cmdOk as _cmdOk } from './src/rules/commands.js';
+import { GOAL_DEFS, drawGoals, goalOk as _goalOk, goalState as _goalState } from './src/rules/goals.js';
 
 let rng;                         // générateur seedé, initialisé au câblage (bas du script)
 let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
@@ -256,64 +257,10 @@ const onBoard = (q,r)=>_onBoard(q,r,R);
 const neighbors = (q,r)=>_neighbors(q,r,R);
 const sides = (q,r)=>_sides(q,r,R);
 
-/* ---------- objectifs de partie ---------- */
-/* Règle de conception : un objectif ne doit jamais dépendre de ce que la pioche
-   donne, seulement de ce que le joueur en fait. Pas de terrain nommé, pas de
-   longueur de rivière — uniquement des mesures de placement. */
-const plein = b=>b.size === cells.length;
-const closedGroups = b=>groups(b, c=>MASSIF_T.includes(c.terrain)).filter(g=>isClosed(b,g));
-const countCmdDone = b=>{ let n=0; for(const [k,c] of b) if(cmdOk(b,k,c)) n++; return n; };
-const seuls = b=>closedGroups(b).filter(g=>g.cells.length===1).length;
-
-const GOAL_DEFS = {
-  fermer: {
-    chip:'Massifs de 3+', atEnd:false,
-    need:()=>R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short,
-    text:()=>'Fermer '+(R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short)+' massifs d’au moins '+MASSIF_MIN+' cases, quels qu’ils soient',
-    val:b=>closedGroups(b).filter(g=>g.cells.length>=MASSIF_MIN).length },
-  gros: {
-    chip:'Grand massif', atEnd:false,
-    need:()=>R>=R_LONG?GOAL_GROS.long:GOAL_GROS.short,
-    text:()=>'Un massif fermé de '+(R>=R_LONG?GOAL_GROS.long:GOAL_GROS.short)+' cases, n’importe quel terrain',
-    val:b=>closedGroups(b).reduce((m,g)=>Math.max(m,g.cells.length),0) },
-  commandes: {
-    chip:'Commandes', atEnd:false,
-    need:()=>R>=R_LONG?GOAL_COMMANDES.long:GOAL_COMMANDES.short,
-    text:()=>(R>=R_LONG?'Cinq':'Trois')+' commandes satisfaites',
-    val:countCmdDone },
-  tot: {
-    chip:'Fermer tôt', atEnd:false,
-    need:()=>1,
-    limite:()=>R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short,
-    text:()=>'Fermer un massif de '+MASSIF_MIN+' cases ou plus avant la '+(R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short)+'ᵉ case posée',
-    val:b=>(b.size <= (R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short) && closedGroups(b).some(g=>g.cells.length>=MASSIF_MIN))?1:0,
-    state:b=>{ const l = R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short; return b.size<=l ? b.size+'/'+l : 'raté'; } },
-  defausse: {
-    chip:'Sans défausse', atEnd:true,
-    need:()=>1,
-    text:()=>'Terminer la partie sans rien défausser',
-    val:b=>(plein(b) && discards===DISCARDS_MAX)?1:0,
-    state:()=>discards===DISCARDS_MAX?'intacte':'perdu' },
-  isoles: {
-    chip:()=>'Moins de '+((R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short)+1)+' isolés', atEnd:true,
-    need:()=>1,
-    text:()=>'Terminer avec au plus '+(R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short)+' massifs réduits à une seule case',
-    val:b=>(plein(b) && seuls(b) <= (R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short))?1:0,
-    state:b=>seuls(b)+' isolé'+(seuls(b)>1?'s':'') },
-};
-
-function drawGoals(rng){
-  return Object.keys(GOAL_DEFS).sort(()=>rng()-0.5).slice(0,3)
-         .map(id=>({id, done:false}));
-}
-const goalOk = (b,g)=>g.done || GOAL_DEFS[g.id].val(b) >= GOAL_DEFS[g.id].need();
-function goalState(b,g){
-  const d = GOAL_DEFS[g.id];
-  if(goalOk(b,g)) return '✓';
-  if(d.state) return d.state(b);
-  const need = d.need();
-  return need>1 ? Math.min(d.val(b),need)+'/'+need : '—';
-}
+/* ---------- objectifs de partie (règles pures dans src/rules/goals.js) ---------- */
+const goalCtx = ()=>({R, cells, discards});          // contexte courant injecté aux objectifs
+const goalOk = (b,g)=>_goalOk(b,g,goalCtx());
+const goalState = (b,g)=>_goalState(b,g,goalCtx());
 
 /* ---------- état ---------- */
 let board, hand, nextHand, history, sel, ghost, effects, cachedScore;
@@ -1096,10 +1043,10 @@ function renderGoals(){
     const ok = goalOk(board,g);
     const e = document.createElement('div');
     e.className = 'goal' + (ok?' ok':'');
-    const chip = typeof d.chip==='function' ? d.chip() : d.chip;
+    const chip = typeof d.chip==='function' ? d.chip(goalCtx()) : d.chip;
     e.innerHTML = '<b>'+chip+'</b><i>'+goalState(board,g)+'</i>';
     e.addEventListener('click', ()=>{
-      el('hint').textContent = d.text() + (ok?' — acquis' : ' · +'+GOAL_BONUS+' pts');
+      el('hint').textContent = d.text(goalCtx()) + (ok?' — acquis' : ' · +'+GOAL_BONUS+' pts');
     });
     wrap.appendChild(e);
   });
