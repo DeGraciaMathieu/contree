@@ -244,6 +244,7 @@ import { groups as _groups, isClosed as _isClosed, waterGroups } from './src/rul
 import { cmdOk as _cmdOk } from './src/rules/commands.js';
 import { GOAL_DEFS, drawGoals, goalOk as _goalOk, goalState as _goalState } from './src/rules/goals.js';
 import { score as _score } from './src/rules/score.js';
+import { validTargets as _validTargets } from './src/rules/targets.js';
 
 let rng;                         // générateur seedé, initialisé au câblage (bas du script)
 let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
@@ -670,15 +671,7 @@ function render(){
   requestAnimationFrame(render);
 }
 
-function validTargets(){
-  const s = new Set();
-  for(const [q,r] of cells){
-    const k = key(q,r);
-    if(board.has(k)) continue;
-    if(neighbors(q,r).some(n=>board.has(key(n[0],n[1])))) s.add(k);
-  }
-  return s;
-}
+const validTargets = ()=>_validTargets(board, cells, R);   // wrapper liant l'état courant
 
 /* ---------- meilleurs scores ---------- */
 function setFormat(r, restart){
