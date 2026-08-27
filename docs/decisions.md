@@ -36,6 +36,20 @@ pilotage événementiel.
    motifs/animations) restent dans `render/`, sans graine ni injection.
 5. Timing d'orchestration (`syncClosed`, `cascade`, `finish`) reste dans `loop/`.
 
+## Aléa et temps — classification (étape 4)
+
+**Dé-randomisés (RNG seedé injecté)** — code de règles/tirage :
+`drawTerrain`, `drawTile`, `drawHand`, `drawGoals`, `seeds`. Reçoivent `rng` en
+argument ; la graine est décidée au câblage (`rng = createRng(Date.now()>>>0)`).
+
+**Laissés cosmétiques (pas de graine)** — ne nourrissent que le rendu :
+- `spawnDust` : position/vitesse/taille/durée des grains (`Math.random()`).
+- Tous les `performance.now()` : motifs (cimes, vagues, moulin), lueur, fumée, nuage,
+  poussière, `render`, effets `pop`/`float`/`jolt`, `syncClosed`, `cascade`, `finish`.
+
+**Laissé persistance** — `Date.now()` dans `saveScore` : horodatage de l'entrée de
+classement. Ce n'est pas une règle (I/O localStorage).
+
 ## Deliberately left alone
 
 _(comportements « à corriger » repérés mais laissés identiques — à remplir si rencontré)_

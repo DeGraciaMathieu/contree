@@ -238,7 +238,9 @@ import {
   STEP, DUST_MAX, SMOKE_T, LIGHT_T, SCORE_INTERP, FINISH_CAP, FINISH_MARGIN,
   TOP_N, LS_FMT, LS_KEY,
 } from './src/config.js';
+import { createRng } from './src/rules/rng.js';
 
+let rng;                         // générateur seedé, initialisé au câblage (bas du script)
 let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
 let CROSS = CROSS_FACTOR*R;      // prime de traversée, proportionnelle au plateau
 const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -307,8 +309,8 @@ const GOAL_DEFS = {
     state:b=>seuls(b)+' isolé'+(seuls(b)>1?'s':'') },
 };
 
-function drawGoals(){
-  return Object.keys(GOAL_DEFS).sort(()=>Math.random()-0.5).slice(0,3)
+function drawGoals(rng){
+  return Object.keys(GOAL_DEFS).sort(()=>rng()-0.5).slice(0,3)
          .map(id=>({id, done:false}));
 }
 const goalOk = (b,g)=>g.done || GOAL_DEFS[g.id].val(b) >= GOAL_DEFS[g.id].need();
@@ -325,31 +327,31 @@ let board, hand, nextHand, history, sel, ghost, effects, cachedScore;
 let discards, closedAt, shownScore, finished, insp = null;
 let dust = [], deal = false, goals = [];
 
-function drawTerrain(){
+function drawTerrain(rng){
   const tot = WEIGHTS.reduce((a,w)=>a+w[1],0);
-  let n = Math.random()*tot;
+  let n = rng()*tot;
   for(const [t,w] of WEIGHTS){ n-=w; if(n<=0) return t; }
   return 'foret';
 }
-function drawTile(){
-  const terrain = drawTerrain();
+function drawTile(rng){
+  const terrain = drawTerrain(rng);
   const rares = Object.keys(RARES).filter(k=>RARES[k].on===terrain);
-  if(rares.length && Math.random()<RARE_CHANCE)
-    return {terrain, cmd:null, done:false, rare:rares[(Math.random()*rares.length)|0]};
+  if(rares.length && rng()<RARE_CHANCE)
+    return {terrain, cmd:null, done:false, rare:rares[(rng()*rares.length)|0]};
   const pool = Object.keys(COMMANDS).filter(k=>COMMANDS[k].on===terrain);
-  const cmd = (pool.length && Math.random()<CMD_CHANCE) ? pool[(Math.random()*pool.length)|0] : null;
+  const cmd = (pool.length && rng()<CMD_CHANCE) ? pool[(rng()*pool.length)|0] : null;
   return {terrain, cmd, done:false, rare:null};
 }
-const drawHand = ()=>[drawTile(),drawTile(),drawTile()];
+const drawHand = (rng)=>[drawTile(rng),drawTile(rng),drawTile(rng)];
 
 const dist = (a,b)=>(Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[0]+a[1]-b[0]-b[1]))/2;
 
-function seeds(){                              // 4 amorces dispersées : chaque partie démarre autrement
+function seeds(rng){                           // 4 amorces dispersées : chaque partie démarre autrement
   const out = [[0,0]];
   const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=SEED_RING_MIN && d<=SEED_RING_MAX; });
   let guard = 0;
   while(out.length<SEED_COUNT && guard++<400){
-    const c = pool[(Math.random()*pool.length)|0];
+    const c = pool[(rng()*pool.length)|0];
     if(out.every(o=>dist(o,c)>=SEED_SPACING)) out.push(c);
   }
   return out;
@@ -357,10 +359,10 @@ function seeds(){                              // 4 amorces dispersées : chaque
 
 function newGame(){
   board = new Map();
-  for(const [q,r] of seeds())
-    board.set(key(q,r), {terrain:drawTerrain(), cmd:null, done:false, rare:null});
-  goals = drawGoals();
-  hand = drawHand(); nextHand = drawHand(); deal = true;
+  for(const [q,r] of seeds(rng))
+    board.set(key(q,r), {terrain:drawTerrain(rng), cmd:null, done:false, rare:null});
+  goals = drawGoals(rng);
+  hand = drawHand(rng); nextHand = drawHand(rng); deal = true;
   history = []; sel = null; ghost = null; effects = []; dust = [];
   discards = DISCARDS_MAX; closedAt = new Map();
   finished = false; document.body.classList.remove('done'); hideInspect();
@@ -1073,7 +1075,7 @@ function commit(){
   cascade(k);
   syncClosed(false);
   hand[sel] = null; ghost = null; sel = null;
-  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(); deal = true; }
+  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(rng); deal = true; }
   renderAll();
   if([...cells].every(([q,r])=>board.has(key(q,r)))) finish();
 }
@@ -1083,7 +1085,7 @@ function discard(){
   snapshot();
   discards--;
   hand[sel] = null; ghost = null; sel = null;
-  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(); deal = true; }
+  if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(rng); deal = true; }
   snd.defausse(); buzz(6);
   el('hint').textContent = discards ? 'Tuile écartée. Il t\u2019en reste '+discards+'.' : 'Tuile écartée. C\u2019était la dernière.';
   renderAll();
@@ -1224,6 +1226,7 @@ el('fmt3').addEventListener('click', ()=>{ setFormat(R_SHORT,true); el('sheet').
 el('fmt4').addEventListener('click', ()=>{ setFormat(R_LONG,true); el('sheet').classList.remove('on'); });
 
 addEventListener('pointerdown', ()=>snd.ready(), {once:true});
+rng = createRng((Date.now() >>> 0));           // graine décidée ici, au câblage
 let fmt = R_SHORT;
 try{ const v = parseInt(localStorage.getItem(LS_FMT),10); if(v===R_SHORT||v===R_LONG) fmt = v; }catch(e){}
 setFormat(fmt, false);
