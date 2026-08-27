@@ -230,17 +230,18 @@
 
 <script type="module">
 import {
-  R_LONG, R_SHORT, CROSS_FACTOR, DIRS, TERRAINS, WEIGHTS, CMD_CHANCE, RARE_CHANCE,
+  R_LONG, R_SHORT, CROSS_FACTOR, TERRAINS,
   COMMANDS, CMD_BONUS, CMD_FORETS3, CMD_EAU2, CMD_VILLAGES2, CMD_MASSIF5,
   RARES, MOULIN_BONUS, RIVER_PT, VILLAGE_PT, VILLAGE_WATER_MULT, MASSIF_T,
-  DISCARDS_MAX, HISTORY_MAX, SEED_COUNT, SEED_RING_MIN, SEED_RING_MAX, SEED_SPACING,
+  DISCARDS_MAX, HISTORY_MAX,
   GOAL_BONUS,
   STEP, DUST_MAX, SMOKE_T, LIGHT_T, SCORE_INTERP, FINISH_CAP, FINISH_MARGIN,
   TOP_N, LS_FMT, LS_KEY,
 } from './src/config.js';
 import { createRng } from './src/rules/rng.js';
-import { key, buildCells, onBoard as _onBoard, neighbors as _neighbors, sides as _sides, dist } from './src/rules/geometry.js';
+import { key, buildCells, onBoard as _onBoard, neighbors as _neighbors, sides as _sides } from './src/rules/geometry.js';
 import { groups as _groups, isClosed as _isClosed, waterGroups } from './src/rules/groups.js';
+import { drawTerrain, drawHand, seeds } from './src/rules/deck.js';
 import { cmdOk as _cmdOk } from './src/rules/commands.js';
 import { GOAL_DEFS, drawGoals, goalOk as _goalOk, goalState as _goalState } from './src/rules/goals.js';
 import { score as _score } from './src/rules/score.js';
@@ -269,37 +270,9 @@ let board, hand, nextHand, history, sel, ghost, effects, cachedScore;
 let discards, closedAt, shownScore, finished, insp = null;
 let dust = [], deal = false, goals = [];
 
-function drawTerrain(rng){
-  const tot = WEIGHTS.reduce((a,w)=>a+w[1],0);
-  let n = rng()*tot;
-  for(const [t,w] of WEIGHTS){ n-=w; if(n<=0) return t; }
-  return 'foret';
-}
-function drawTile(rng){
-  const terrain = drawTerrain(rng);
-  const rares = Object.keys(RARES).filter(k=>RARES[k].on===terrain);
-  if(rares.length && rng()<RARE_CHANCE)
-    return {terrain, cmd:null, done:false, rare:rares[(rng()*rares.length)|0]};
-  const pool = Object.keys(COMMANDS).filter(k=>COMMANDS[k].on===terrain);
-  const cmd = (pool.length && rng()<CMD_CHANCE) ? pool[(rng()*pool.length)|0] : null;
-  return {terrain, cmd, done:false, rare:null};
-}
-const drawHand = (rng)=>[drawTile(rng),drawTile(rng),drawTile(rng)];
-
-function seeds(rng){                           // 4 amorces dispersées : chaque partie démarre autrement
-  const out = [[0,0]];
-  const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=SEED_RING_MIN && d<=SEED_RING_MAX; });
-  let guard = 0;
-  while(out.length<SEED_COUNT && guard++<400){
-    const c = pool[(rng()*pool.length)|0];
-    if(out.every(o=>dist(o,c)>=SEED_SPACING)) out.push(c);
-  }
-  return out;
-}
-
 function newGame(){
   board = new Map();
-  for(const [q,r] of seeds(rng))
+  for(const [q,r] of seeds(rng, cells))
     board.set(key(q,r), {terrain:drawTerrain(rng), cmd:null, done:false, rare:null});
   goals = drawGoals(rng);
   hand = drawHand(rng); nextHand = drawHand(rng); deal = true;
