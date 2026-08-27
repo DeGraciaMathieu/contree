@@ -239,29 +239,20 @@ import {
   TOP_N, LS_FMT, LS_KEY,
 } from './src/config.js';
 import { createRng } from './src/rules/rng.js';
+import { key, buildCells, onBoard as _onBoard, neighbors as _neighbors, sides as _sides, dist } from './src/rules/geometry.js';
 
 let rng;                         // générateur seedé, initialisé au câblage (bas du script)
 let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
 let CROSS = CROSS_FACTOR*R;      // prime de traversée, proportionnelle au plateau
 const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
-/* ---------- géométrie ---------- */
-const key = (q,r)=>q+','+r;
+/* ---------- géométrie (règles pures dans src/rules/geometry.js) ---------- */
 let cells = [];
-function buildShape(){
-  cells = [];
-  for(let q=-R;q<=R;q++) for(let r=-R;r<=R;r++) if(Math.abs(q+r)<=R) cells.push([q,r]);
-}
+function buildShape(){ cells = buildCells(R); }   // lie la géométrie pure au rayon courant
 buildShape();
-const onBoard = (q,r)=>Math.abs(q)<=R && Math.abs(r)<=R && Math.abs(q+r)<=R;
-const neighbors = (q,r)=>DIRS.map(d=>[q+d[0],r+d[1]]).filter(c=>onBoard(c[0],c[1]));
-
-function sides(q,r){                       // bords du plateau touchés (0..5, opposés = i et i+3)
-  const x=q, z=r, y=-q-r, s=[];
-  if(x===R)s.push(0); if(z===-R)s.push(1); if(y===R)s.push(2);
-  if(x===-R)s.push(3); if(z===R)s.push(4); if(y===-R)s.push(5);
-  return s;
-}
+const onBoard = (q,r)=>_onBoard(q,r,R);
+const neighbors = (q,r)=>_neighbors(q,r,R);
+const sides = (q,r)=>_sides(q,r,R);
 
 /* ---------- objectifs de partie ---------- */
 /* Règle de conception : un objectif ne doit jamais dépendre de ce que la pioche
@@ -343,8 +334,6 @@ function drawTile(rng){
   return {terrain, cmd, done:false, rare:null};
 }
 const drawHand = (rng)=>[drawTile(rng),drawTile(rng),drawTile(rng)];
-
-const dist = (a,b)=>(Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[0]+a[1]-b[0]-b[1]))/2;
 
 function seeds(rng){                           // 4 amorces dispersées : chaque partie démarre autrement
   const out = [[0,0]];
