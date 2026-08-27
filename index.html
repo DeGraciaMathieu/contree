@@ -147,6 +147,8 @@
   .slot .cmd.rare{color:#f0d089;font-weight:600}
   #discard{white-space:nowrap}
   /* écran d'accueil */
+  .start{background:radial-gradient(130% 100% at 50% 25%,var(--ink-2),var(--ink));
+    -webkit-backdrop-filter:none;backdrop-filter:none;animation:none}  /* opaque, sans fondu : le plateau ne transparaît jamais */
   .start .start-card{width:100%;max-width:360px;text-align:center;
     background:radial-gradient(120% 90% at 50% 0,#183031,var(--ink-2));
     border:1px solid var(--line);border-radius:22px;padding:32px 26px 24px;
@@ -234,7 +236,7 @@
   </div>
 </div>
 
-<div class="modal start" id="start">
+<div class="modal start on" id="start">
   <div class="start-card">
     <div class="start-emo">🌿</div>
     <h2>Contrée</h2>
