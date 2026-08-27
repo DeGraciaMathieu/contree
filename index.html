@@ -35,6 +35,17 @@
     font-variant-numeric:tabular-nums;display:block}
   .score span{font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
 
+  .goals{display:flex;gap:6px}
+  .goal{flex:1;min-width:0;background:var(--ink-2);border:1px solid var(--line);
+    border-radius:10px;padding:5px 7px;font-size:10.5px;color:var(--muted);
+    display:flex;justify-content:space-between;gap:5px;cursor:pointer;
+    white-space:nowrap;overflow:hidden;transition:border-color .2s ease,color .2s ease}
+  .goal b{font-weight:400;overflow:hidden;text-overflow:ellipsis}
+  .goal i{font-style:normal;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .goal.ok{border-color:var(--ochre);color:var(--ochre)}
+  .seg{display:flex;gap:8px;margin-bottom:14px}
+  .seg button{flex:1;margin:0}
+  .seg button.on{background:var(--ochre);border-color:var(--ochre);color:#241a06}
   .boardwrap{position:relative;background:var(--ink-2);border:1px solid var(--line);
     border-radius:18px;overflow:hidden}
   canvas#board{display:block;width:100%;touch-action:manipulation}
@@ -81,13 +92,13 @@
   .next canvas{width:22px;height:26px}
 
   .over{position:absolute;inset:0;background:rgba(12,26,27,.94);display:none;
-    flex-direction:column;justify-content:center;gap:6px;padding:26px}
+    flex-direction:column;justify-content:center;gap:4px;padding:18px 20px;overflow-y:auto}
   .over.on{display:flex}
-  .over h2{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0 0 8px}
-  .over .row{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;
+  .over h2{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:0 0 4px}
+  .over .row{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0;
     border-bottom:1px solid var(--line)}
-  .over .row.tot{border:0;margin-top:6px;font-family:'Fraunces',serif;font-size:21px}
-  .over button{margin-top:16px}
+  .over .row.tot{border:0;margin-top:4px;font-family:'Fraunces',serif;font-size:20px}
+  .over button{margin-top:12px}
   .over .pair{display:flex;gap:8px}
   .over .pair button{flex:1}
   .endbar{display:none;gap:8px}
@@ -145,6 +156,8 @@
     <div class="score"><b id="score">0</b><span>points</span></div>
   </header>
 
+  <div class="goals" id="goals"></div>
+
   <div class="boardwrap">
     <canvas id="board"></canvas>
     <div class="insp" id="insp">
@@ -190,7 +203,7 @@
 
 <div class="modal" id="scores">
   <div class="card">
-    <h2>Meilleurs scores</h2>
+    <h2 id="lbtitre">Meilleurs scores</h2>
     <div id="scores-b"></div>
     <button class="primary" id="closescores">Fermer</button>
   </div>
@@ -199,6 +212,11 @@
 <div class="modal" id="sheet">
   <div class="card">
     <h2>Comment ça compte</h2>
+      <div class="seg">
+        <button data-r="3" id="fmt3">Court · 37 cases</button>
+        <button data-r="4" id="fmt4">Long · 61 cases</button>
+      </div>
+      <div class="rule"><b>Objectifs</b> — trois contrats tirés au début de la partie, 30 points chacun. Ils ne portent jamais sur un terrain précis : seulement sur ce que tu fais des tuiles reçues.</div>
       <div class="rule"><b>Massifs</b> — un groupe de forêts, champs ou pierres vaut sa taille au carré une fois entièrement entouré. Grand et compact vaut mieux que dispersé.</div>
       <div class="rule"><b>Rivières</b> — 3 points par tuile d'eau reliée, et 40 de plus si la rivière relie deux bords opposés.</div>
       <div class="rule"><b>Villages</b> — 2 points par terrain différent autour, doublé s'ils touchent l'eau.</div>
@@ -212,7 +230,8 @@
 
 <script>
 'use strict';
-const R = 4;                       // rayon du plateau
+let R = 4;                        // rayon du plateau : 3 = court, 4 = long
+let CROSS = 10*R;                 // prime de traversée, proportionnelle au plateau
 const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
 const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
@@ -244,8 +263,12 @@ const DISCARDS_MAX = 3;
 
 /* ---------- géométrie ---------- */
 const key = (q,r)=>q+','+r;
-const cells = [];
-for(let q=-R;q<=R;q++) for(let r=-R;r<=R;r++) if(Math.abs(q+r)<=R) cells.push([q,r]);
+let cells = [];
+function buildShape(){
+  cells = [];
+  for(let q=-R;q<=R;q++) for(let r=-R;r<=R;r++) if(Math.abs(q+r)<=R) cells.push([q,r]);
+}
+buildShape();
 const onBoard = (q,r)=>Math.abs(q)<=R && Math.abs(r)<=R && Math.abs(q+r)<=R;
 const neighbors = (q,r)=>DIRS.map(d=>[q+d[0],r+d[1]]).filter(c=>onBoard(c[0],c[1]));
 
@@ -256,10 +279,71 @@ function sides(q,r){                       // bords du plateau touchés (0..5, o
   return s;
 }
 
+/* ---------- objectifs de partie ---------- */
+/* Règle de conception : un objectif ne doit jamais dépendre de ce que la pioche
+   donne, seulement de ce que le joueur en fait. Pas de terrain nommé, pas de
+   longueur de rivière — uniquement des mesures de placement. */
+const GOAL_BONUS = 30;
+const MASSIF_T = ['foret','champ','pierre'];
+const plein = b=>b.size === cells.length;
+const closedGroups = b=>groups(b, c=>MASSIF_T.includes(c.terrain)).filter(g=>isClosed(b,g));
+const countCmdDone = b=>{ let n=0; for(const [k,c] of b) if(cmdOk(b,k,c)) n++; return n; };
+const seuls = b=>closedGroups(b).filter(g=>g.cells.length===1).length;
+
+const GOAL_DEFS = {
+  fermer: {
+    chip:'Massifs de 3+', atEnd:false,
+    need:()=>R>=4?6:4,
+    text:()=>'Fermer '+(R>=4?6:4)+' massifs d’au moins 3 cases, quels qu’ils soient',
+    val:b=>closedGroups(b).filter(g=>g.cells.length>=3).length },
+  gros: {
+    chip:'Grand massif', atEnd:false,
+    need:()=>R>=4?11:8,
+    text:()=>'Un massif fermé de '+(R>=4?11:8)+' cases, n’importe quel terrain',
+    val:b=>closedGroups(b).reduce((m,g)=>Math.max(m,g.cells.length),0) },
+  commandes: {
+    chip:'Commandes', atEnd:false,
+    need:()=>R>=4?5:3,
+    text:()=>(R>=4?'Cinq':'Trois')+' commandes satisfaites',
+    val:countCmdDone },
+  tot: {
+    chip:'Fermer tôt', atEnd:false,
+    need:()=>1,
+    limite:()=>R>=4?46:30,
+    text:()=>'Fermer un massif de 3 cases ou plus avant la '+(R>=4?46:30)+'ᵉ case posée',
+    val:b=>(b.size <= (R>=4?46:30) && closedGroups(b).some(g=>g.cells.length>=3))?1:0,
+    state:b=>{ const l = R>=4?46:30; return b.size<=l ? b.size+'/'+l : 'raté'; } },
+  defausse: {
+    chip:'Sans défausse', atEnd:true,
+    need:()=>1,
+    text:()=>'Terminer la partie sans rien défausser',
+    val:b=>(plein(b) && discards===DISCARDS_MAX)?1:0,
+    state:()=>discards===DISCARDS_MAX?'intacte':'perdu' },
+  isoles: {
+    chip:()=>'Moins de '+(R>=4?8:6)+' isolés', atEnd:true,
+    need:()=>1,
+    text:()=>'Terminer avec au plus '+(R>=4?7:5)+' massifs réduits à une seule case',
+    val:b=>(plein(b) && seuls(b) <= (R>=4?7:5))?1:0,
+    state:b=>seuls(b)+' isolé'+(seuls(b)>1?'s':'') },
+};
+
+function drawGoals(){
+  return Object.keys(GOAL_DEFS).sort(()=>Math.random()-0.5).slice(0,3)
+         .map(id=>({id, done:false}));
+}
+const goalOk = (b,g)=>g.done || GOAL_DEFS[g.id].val(b) >= GOAL_DEFS[g.id].need();
+function goalState(b,g){
+  const d = GOAL_DEFS[g.id];
+  if(goalOk(b,g)) return '✓';
+  if(d.state) return d.state(b);
+  const need = d.need();
+  return need>1 ? Math.min(d.val(b),need)+'/'+need : '—';
+}
+
 /* ---------- état ---------- */
 let board, hand, nextHand, history, sel, ghost, effects, cachedScore;
 let discards, closedAt, shownScore, finished, insp = null;
-let dust = [], deal = false;
+let dust = [], deal = false, goals = [];
 
 function drawTerrain(){
   const tot = WEIGHTS.reduce((a,w)=>a+w[1],0);
@@ -295,6 +379,7 @@ function newGame(){
   board = new Map();
   for(const [q,r] of seeds())
     board.set(key(q,r), {terrain:drawTerrain(), cmd:null, done:false, rare:null});
+  goals = drawGoals();
   hand = drawHand(); nextHand = drawHand(); deal = true;
   history = []; sel = null; ghost = null; effects = []; dust = [];
   discards = DISCARDS_MAX; closedAt = new Map();
@@ -398,7 +483,7 @@ function score(b){
   for(const g of waterGroups(b)){
     rivieres += 3*g.length;
     const s = new Set(); g.forEach(k=>{const[q,r]=k.split(',').map(Number); sides(q,r).forEach(i=>s.add(i));});
-    if([...s].some(i=>s.has((i+3)%6))){ rivieres += 40; g.forEach(k=>glow.add(k)); }
+    if([...s].some(i=>s.has((i+3)%6))){ rivieres += CROSS; g.forEach(k=>glow.add(k)); }
   }
   for(const [k,c] of b){
     if(c.terrain!=='village') continue;
@@ -411,8 +496,10 @@ function score(b){
     villages += v;
   }
   for(const [k,c] of b) if(cmdOk(b,k,c)) commandes += CMD_BONUS;
-  return {massifs,rivieres,villages,commandes,closed,glow,
-          total:massifs+rivieres+villages+commandes};
+  let objectifs = 0;
+  for(const g of goals) if(goalOk(b,g)) objectifs += GOAL_BONUS;
+  return {massifs,rivieres,villages,commandes,objectifs,closed,glow,
+          total:massifs+rivieres+villages+commandes+objectifs};
 }
 
 /* ---------- son ---------- */
@@ -769,18 +856,32 @@ function validTargets(){
 }
 
 /* ---------- meilleurs scores ---------- */
+const LS_FMT = 'contree.format';
+function setFormat(r, restart){
+  R = r; CROSS = 10*r;
+  buildShape();
+  try{ localStorage.setItem(LS_FMT, String(r)); }catch(e){}
+  el('fmt3').classList.toggle('on', r===3);
+  el('fmt4').classList.toggle('on', r===4);
+  el('lbtitre').textContent = 'Meilleurs scores — '+(r===3?'court':'long');
+  if(restart){ layout(); newGame(); }
+}
+
 const LS_KEY = 'contree.scores.v1';
 const TOP_N = 10;
-function loadScores(){
+function loadAll(){
   try{ const v = JSON.parse(localStorage.getItem(LS_KEY)); return Array.isArray(v) ? v : []; }
   catch(e){ return []; }
 }
+const loadScores = ()=>loadAll().filter(x=>(x.f||4)===R);   // un classement par format
 function bestScore(){ const l = loadScores(); return l.length ? l[0].t : 0; }
 function saveScore(sc){
-  const entry = {t:sc.total, d:Date.now(), m:sc.massifs, r:sc.rivieres, v:sc.villages, c:sc.commandes};
-  const list = loadScores().concat([entry]).sort((a,b)=>b.t-a.t).slice(0,TOP_N);
-  try{ localStorage.setItem(LS_KEY, JSON.stringify(list)); }catch(e){}
-  return {list, entry, rank:list.indexOf(entry)+1};
+  const entry = {t:sc.total, d:Date.now(), f:R, m:sc.massifs, r:sc.rivieres,
+                 v:sc.villages, c:sc.commandes, o:sc.objectifs};
+  const mine = loadScores().concat([entry]).sort((a,b)=>b.t-a.t).slice(0,TOP_N);
+  const autres = loadAll().filter(x=>(x.f||4)!==R);
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(autres.concat(mine))); }catch(e){}
+  return {list:mine, entry, rank:mine.indexOf(entry)+1};
 }
 let lastEntry = null;
 function showScores(){
@@ -863,8 +964,8 @@ function inspectData(k){
     const cross = [...sd].some(i=>sd.has((i+3)%6));
     rows.push(['Rivière de '+g.length, pts(3*g.length)]);
     rows.push(['Une case de plus', '+3 pts', true]);
-    rows.push(cross ? ['Traversée du plateau', '+40 acquis']
-                    : ['Traversée du plateau', sd.size ? '+40 si elle atteint le bord opposé' : '+40 de bord à bord', true]);
+    rows.push(cross ? ['Traversée du plateau', '+'+CROSS+' acquis']
+                    : ['Traversée du plateau', sd.size ? '+'+CROSS+' si elle atteint le bord opposé' : '+'+CROSS+' de bord à bord', true]);
     rule = 'Un pont enjambe une case et raccorde deux tronçons séparés.';
   }
 
@@ -927,6 +1028,8 @@ cv.addEventListener('click', ev=>{
 
 function refreshDelta(){
   el('place').disabled = !ghost;
+  el('discard').disabled = sel===null || !hand[sel] || discards<=0;
+  el('dleft').textContent = discards;
   if(!ghost){ el('delta').textContent=''; return; }
   const test = new Map(board);
   test.set(key(ghost[0],ghost[1]), {...hand[sel]});
@@ -939,7 +1042,8 @@ function refreshDelta(){
 
 function snapshot(){
   history.push({board:new Map([...board].map(([k,v])=>[k,{...v}])),
-                hand:hand.map(t=>t&&{...t}), nextHand:nextHand.map(t=>({...t})), discards});
+                hand:hand.map(t=>t&&{...t}), nextHand:nextHand.map(t=>({...t})),
+                discards, goals:goals.map(g=>({...g}))});
   if(history.length>40) history.shift();
 }
 
@@ -981,6 +1085,7 @@ function commit(){
   const before = cachedScore.total;
   cachedScore = score(board);
   for(const [bk,c] of board) if(c.cmd && !c.done && cmdOk(board,bk,c)) c.done = true;
+  for(const g of goals) if(!g.done && goalOk(board,g)){ g.done = true; snd.fanfare(); }
   const gain = cachedScore.total - before;
   effects.push({type:'pop',k,t:performance.now()});
   if(gain!==0) effects.push({type:'float',q:ghost[0],r:ghost[1],n:gain,t:performance.now()});
@@ -1029,6 +1134,7 @@ function finish(){
   el('breakdown').innerHTML =
     row('Massifs fermés', s.massifs) + row('Rivières', s.rivieres) +
     row('Villages', s.villages) + row('Commandes', s.commandes) +
+    row('Objectifs', s.objectifs) +
     '<div class="row tot"><span>Total</span><span>'+s.total+'</span></div>' +
     '<div class="row rec"><span>'+ligne+'</span><span></span></div>';
   // on laisse la dernière cascade se terminer avant de recouvrir le plateau
@@ -1084,12 +1190,27 @@ function paintMini(canvas, tile, size){
   ctx = keep;
 }
 
+function renderGoals(){
+  const wrap = el('goals'); wrap.innerHTML = '';
+  goals.forEach(g=>{
+    const d = GOAL_DEFS[g.id];
+    const ok = goalOk(board,g);
+    const e = document.createElement('div');
+    e.className = 'goal' + (ok?' ok':'');
+    const chip = typeof d.chip==='function' ? d.chip() : d.chip;
+    e.innerHTML = '<b>'+chip+'</b><i>'+goalState(board,g)+'</i>';
+    e.addEventListener('click', ()=>{
+      el('hint').textContent = d.text() + (ok?' — acquis' : ' · +'+GOAL_BONUS+' pts');
+    });
+    wrap.appendChild(e);
+  });
+}
+
 function renderAll(){
   buildLightPath();
+  renderGoals();
   el('undo').disabled = history.length===0;
   el('place').disabled = !ghost;
-  el('discard').disabled = sel===null || discards<=0;
-  el('dleft').textContent = discards;
   renderHand();
   refreshDelta();
 }
@@ -1097,7 +1218,7 @@ function renderAll(){
 el('place').addEventListener('click', commit);
 el('undo').addEventListener('click', ()=>{
   const h = history.pop(); if(!h) return;
-  board = h.board; hand = h.hand; nextHand = h.nextHand; discards = h.discards;
+  board = h.board; hand = h.hand; nextHand = h.nextHand; discards = h.discards; goals = h.goals;
   sel=null; ghost=null; effects=[]; dust=[]; cachedScore = score(board);
   closedAt = new Map(); syncClosed(true); hideInspect();
   shownScore = cachedScore.total; el('score').textContent = shownScore;
@@ -1127,7 +1248,13 @@ el('closescores').addEventListener('click', ()=>el('scores').classList.remove('o
 el('scores').addEventListener('click', ev=>{ if(ev.target===el('scores')) el('scores').classList.remove('on'); });
 addEventListener('resize', ()=>{ layout(); });
 
+el('fmt3').addEventListener('click', ()=>{ setFormat(3,true); el('sheet').classList.remove('on'); });
+el('fmt4').addEventListener('click', ()=>{ setFormat(4,true); el('sheet').classList.remove('on'); });
+
 addEventListener('pointerdown', ()=>snd.ready(), {once:true});
+let fmt = 3;
+try{ const v = parseInt(localStorage.getItem(LS_FMT),10); if(v===3||v===4) fmt = v; }catch(e){}
+setFormat(fmt, false);
 layout(); newGame(); render();
 </script>
 </body>
