@@ -89,8 +89,11 @@ export function commit(){
   }
   cascade(k);
   syncClosed(false);
-  G.hand[G.sel] = null; G.ghost = null; G.sel = null;
+  G.hand[G.sel] = null; G.ghost = null;
   if(G.hand.every(t=>t===null)){ G.hand = G.nextHand; G.nextHand = drawHand(G.rng); G.deal = true; }
+  const next = G.hand.findIndex(t=>t);          // sélectionne automatiquement la prochaine tuile à poser
+  G.sel = next===-1 ? null : next;
+  if(G.sel!==null) el('hint').textContent = 'Touche une case libre.';
   renderAll();
   if([...G.cells].every(([q,r])=>G.board.has(key(q,r)))) finish();
 }
