@@ -4,7 +4,7 @@
 // Règle de conception : un objectif ne doit jamais dépendre de ce que la pioche donne,
 // seulement de ce que le joueur en fait. Pas de terrain nommé, pas de longueur de
 // rivière — uniquement des mesures de placement.
-import { MASSIF_T, MASSIF_MIN, DISCARDS_MAX, R_LONG,
+import { MASSIF_T, MASSIF_MIN, DISCARDS_MAX, R_LONG, GOALS_PER_GAME,
          GOAL_FERMER, GOAL_GROS, GOAL_COMMANDES, GOAL_TOT_LIMIT, GOAL_ISOLES } from '../config.js';
 import { groups, isClosed } from './groups.js';
 import { cmdOk } from './commands.js';
@@ -52,7 +52,7 @@ export const GOAL_DEFS = {
 };
 
 export function drawGoals(rng){
-  return Object.keys(GOAL_DEFS).sort(()=>rng()-0.5).slice(0,3)
+  return Object.keys(GOAL_DEFS).sort(()=>rng()-0.5).slice(0,GOALS_PER_GAME)
          .map(id=>({id, done:false}));
 }
 export const goalOk = (b,g,ctx)=>g.done || GOAL_DEFS[g.id].val(b,ctx) >= GOAL_DEFS[g.id].need(ctx);

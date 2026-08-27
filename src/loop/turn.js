@@ -1,7 +1,7 @@
 // Boucle de jeu au tour par tour : intention → règle → état → rendu. Orchestre les
 // règles pures, l'état G, le rendu et le son ; contient le timing d'animation (cascade,
 // délai de fin) qui n'est pas une règle.
-import { DISCARDS_MAX, STEP, FINISH_CAP, FINISH_MARGIN, CROSS_FACTOR, LS_FMT, R_SHORT, R_LONG } from '../config.js';
+import { DISCARDS_MAX, STEP, JOLT_DELAY, FINISH_CAP, FINISH_MARGIN, CROSS_FACTOR, LS_FMT, R_SHORT, R_LONG } from '../config.js';
 import { key } from '../rules/geometry.js';
 import { drawTerrain, drawHand, seeds } from '../rules/deck.js';
 import { drawGoals } from '../rules/goals.js';
@@ -84,7 +84,7 @@ export function commit(){
     const nk = key(nq,nr);
     if(!G.board.has(nk)) continue;
     const [nx,ny] = px(nq,nr), d = Math.hypot(nx-cx,ny-cy) || 1;
-    G.effects.push({type:'jolt', k:nk, t:performance.now()+40, ox:(nx-cx)/d, oy:(ny-cy)/d});
+    G.effects.push({type:'jolt', k:nk, t:performance.now()+JOLT_DELAY, ox:(nx-cx)/d, oy:(ny-cy)/d});
   }
   cascade(k);
   syncClosed(false);
