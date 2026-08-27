@@ -71,8 +71,13 @@
     min-height:24px;padding:0 2px}
   .slot .cmd.none{color:var(--muted);opacity:.5}
 
-  .next{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);
-    letter-spacing:.12em;text-transform:uppercase}
+  .next{display:flex;align-items:center;flex-wrap:nowrap;gap:7px;font-size:10px;
+    color:var(--muted);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+  .next .lbl{flex-shrink:0}
+  .next .ico.off{text-decoration:line-through;opacity:.5}
+  .next .ico{font-size:14px;letter-spacing:0;padding:3px 6px;line-height:1;
+    font-family:system-ui,sans-serif}
+  @media (max-width:352px){.next .lbl{display:none}}
   .next canvas{width:22px;height:26px}
 
   .over{position:absolute;inset:0;background:rgba(12,26,27,.94);display:none;
@@ -88,7 +93,7 @@
   .endbar{display:none;gap:8px}
   body.done .endbar{display:flex}
   body.done .actions, body.done .hand, body.done .next{display:none}
-  .endbar button{flex:1}
+  .endbar button{flex:1;white-space:nowrap;padding:11px 8px;font-size:13px}
   .insp{position:absolute;left:8px;right:8px;bottom:8px;display:none;
     background:rgba(16,34,35,.965);border:1px solid var(--line);border-radius:14px;
     padding:9px 12px 11px;animation:fade .18s ease}
@@ -116,6 +121,15 @@
     padding:18px 18px 16px;-webkit-overflow-scrolling:touch}
   .modal h2{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0 0 10px}
   .modal .card button{margin-top:16px;width:100%}
+  .sc{display:flex;align-items:baseline;gap:10px;font-size:14px;padding:8px 0;
+    border-bottom:1px solid var(--line)}
+  .sc .rk{font-family:'Fraunces',serif;color:var(--muted);width:22px}
+  .sc .dt{color:var(--muted);font-size:12px;margin-left:auto}
+  .sc .pt{font-family:'Fraunces',serif;font-size:17px;font-variant-numeric:tabular-nums;
+    min-width:54px;text-align:right}
+  .sc.me{color:var(--ochre)} .sc.me .rk,.sc.me .dt{color:var(--ochre)}
+  .empty{font-size:13px;color:var(--muted);padding:10px 0}
+  .over .row.rec{border:0;color:var(--ochre);font-size:13px;padding-top:8px}
   button.link{background:none;border:0;padding:2px 5px;color:var(--muted);
     font-size:11px;letter-spacing:.12em;text-transform:uppercase}
   .next .link:first-of-type{margin-left:auto}
@@ -154,7 +168,8 @@
 
   <div class="endbar" id="endbar">
     <button id="seescore" class="primary">Voir le score</button>
-    <button id="again2">Nouvelle partie</button>
+    <button id="palmares2">Leaderboard</button>
+    <button id="again2">Nouvelle</button>
   </div>
 
   <div class="actions">
@@ -165,10 +180,19 @@
 
   <div class="hand" id="hand"></div>
 
-  <div class="next">Ensuite<span id="nextrow" style="display:flex;gap:2px"></span>
-    <button id="sound" class="link">Son</button>
-    <button id="rules" class="link">Règles</button>
-    <button id="reset" class="link">Nouvelle</button>
+  <div class="next"><span class="lbl">Ensuite</span><span id="nextrow" style="display:flex;gap:2px"></span>
+    <button id="palmares" class="link">Leaderboard</button>
+    <button id="sound" class="link ico" title="Son" aria-label="Son">♪</button>
+    <button id="rules" class="link ico" title="Règles" aria-label="Règles">?</button>
+    <button id="reset" class="link ico" title="Nouvelle partie" aria-label="Nouvelle partie">↻</button>
+  </div>
+</div>
+
+<div class="modal" id="scores">
+  <div class="card">
+    <h2>Meilleurs scores</h2>
+    <div id="scores-b"></div>
+    <button class="primary" id="closescores">Fermer</button>
   </div>
 </div>
 
@@ -275,6 +299,7 @@ function newGame(){
   history = []; sel = null; ghost = null; effects = []; dust = [];
   discards = DISCARDS_MAX; closedAt = new Map();
   finished = false; document.body.classList.remove('done'); hideInspect();
+  lastEntry = null; el('scores').classList.remove('on');
   over.classList.remove('on');
   el('sheet').classList.remove('on');
   cachedScore = score(board);
@@ -427,6 +452,14 @@ const snd = {
     const t = this.ac.currentTime + delay;
     this.tone(f,t,0.55,0.09,'sine');
     if(i===total-1) this.tone(f*1.5,t,0.8,0.05,'sine');
+  },
+  fanfare(){                                  // trois notes montantes pour un record
+    if(!this.on || !this.ready()) return;
+    const t = this.ac.currentTime;
+    [659.25, 830.61, 987.77].forEach((f,i)=>{
+      this.tone(f, t+i*0.13, 0.5, 0.09, 'sine');
+      if(i===2) this.tone(f*2, t+i*0.13, 0.7, 0.04, 'sine');
+    });
   },
   defausse(){
     if(!this.on || !this.ready()) return;
@@ -735,6 +768,32 @@ function validTargets(){
   return s;
 }
 
+/* ---------- meilleurs scores ---------- */
+const LS_KEY = 'contree.scores.v1';
+const TOP_N = 10;
+function loadScores(){
+  try{ const v = JSON.parse(localStorage.getItem(LS_KEY)); return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+function bestScore(){ const l = loadScores(); return l.length ? l[0].t : 0; }
+function saveScore(sc){
+  const entry = {t:sc.total, d:Date.now(), m:sc.massifs, r:sc.rivieres, v:sc.villages, c:sc.commandes};
+  const list = loadScores().concat([entry]).sort((a,b)=>b.t-a.t).slice(0,TOP_N);
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(list)); }catch(e){}
+  return {list, entry, rank:list.indexOf(entry)+1};
+}
+let lastEntry = null;
+function showScores(){
+  const list = loadScores();
+  el('scores-b').innerHTML = list.length ? list.map((x,i)=>{
+    const d = new Date(x.d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+    const me = lastEntry && x.d===lastEntry.d ? ' me' : '';
+    return '<div class="sc'+me+'"><span class="rk">'+(i+1)+'</span>'
+         + '<span class="pt">'+x.t+'</span><span class="dt">'+d+'</span></div>';
+  }).join('') : '<div class="empty">Aucune partie terminée pour l’instant. Le pays doit être complet pour compter.</div>';
+  el('scores').classList.add('on');
+}
+
 /* ---------- inspection d'une tuile ---------- */
 const pts = n=>n+(n>1?' pts':' pt');
 
@@ -959,10 +1018,19 @@ function finish(){
   document.body.classList.add('done');
   el('hint').textContent = 'Le pays est complet.';
   const s = cachedScore;
+  const avant = bestScore();
+  const res = saveScore(s);
+  lastEntry = res.entry;
+  const record = s.total > avant;
+  if(record) snd.fanfare();
+  const ligne = record
+    ? (avant ? 'Nouveau record — précédent : '+avant : 'Premier pays achevé')
+    : (res.rank ? res.rank+'ᵉ meilleur score · record : '+avant : 'Record : '+avant);
   el('breakdown').innerHTML =
     row('Massifs fermés', s.massifs) + row('Rivières', s.rivieres) +
     row('Villages', s.villages) + row('Commandes', s.commandes) +
-    '<div class="row tot"><span>Total</span><span>'+s.total+'</span></div>';
+    '<div class="row tot"><span>Total</span><span>'+s.total+'</span></div>' +
+    '<div class="row rec"><span>'+ligne+'</span><span></span></div>';
   // on laisse la dernière cascade se terminer avant de recouvrir le plateau
   const last = Math.max(performance.now(), ...closedAt.values());
   setTimeout(showScore, Math.min(2600, last - performance.now() + 900));
@@ -1040,7 +1108,8 @@ el('undo').addEventListener('click', ()=>{
 el('discard').addEventListener('click', discard);
 el('sound').addEventListener('click', ()=>{
   snd.on = !snd.on;
-  el('sound').textContent = snd.on ? 'Son' : 'Muet';
+  el('sound').classList.toggle('off', !snd.on);
+  el('sound').title = snd.on ? 'Son' : 'Muet';
   if(snd.on){ snd.ready(); snd.clac(); }
 });
 el('reset').addEventListener('click', newGame);
@@ -1052,6 +1121,10 @@ el('again2').addEventListener('click', newGame);
 el('seeboard').addEventListener('click', ()=>over.classList.remove('on'));
 el('seescore').addEventListener('click', showScore);
 el('insp-x').addEventListener('click', hideInspect);
+el('palmares').addEventListener('click', showScores);
+el('palmares2').addEventListener('click', showScores);
+el('closescores').addEventListener('click', ()=>el('scores').classList.remove('on'));
+el('scores').addEventListener('click', ev=>{ if(ev.target===el('scores')) el('scores').classList.remove('on'); });
 addEventListener('resize', ()=>{ layout(); });
 
 addEventListener('pointerdown', ()=>snd.ready(), {once:true});
