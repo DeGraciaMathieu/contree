@@ -228,38 +228,20 @@
   </div>
 </div>
 
-<script>
-'use strict';
-let R = 4;                        // rayon du plateau : 3 = court, 4 = long
-let CROSS = 10*R;                 // prime de traversée, proportionnelle au plateau
-const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+<script type="module">
+import {
+  R_LONG, R_SHORT, CROSS_FACTOR, DIRS, TERRAINS, WEIGHTS, CMD_CHANCE, RARE_CHANCE,
+  COMMANDS, CMD_BONUS, CMD_FORETS3, CMD_EAU2, CMD_VILLAGES2, CMD_MASSIF5,
+  RARES, MOULIN_BONUS, RIVER_PT, VILLAGE_PT, VILLAGE_WATER_MULT, MASSIF_T, MASSIF_MIN,
+  DISCARDS_MAX, HISTORY_MAX, SEED_COUNT, SEED_RING_MIN, SEED_RING_MAX, SEED_SPACING,
+  GOAL_BONUS, GOAL_FERMER, GOAL_GROS, GOAL_COMMANDES, GOAL_TOT_LIMIT, GOAL_ISOLES,
+  STEP, DUST_MAX, SMOKE_T, LIGHT_T, SCORE_INTERP, FINISH_CAP, FINISH_MARGIN,
+  TOP_N, LS_FMT, LS_KEY,
+} from './src/config.js';
+
+let R = R_LONG;                  // rayon courant du plateau (mutable : format court/long)
+let CROSS = CROSS_FACTOR*R;      // prime de traversée, proportionnelle au plateau
 const REDUCED = matchMedia('(prefers-reduced-motion:reduce)').matches;
-
-const TERRAINS = {
-  foret:   {name:'Forêt',   fill:'#3d6b46', dark:'#2a4c31', light:'#5c8f63'},
-  champ:   {name:'Champ',   fill:'#b9903c', dark:'#8f6d29', light:'#d9b563'},
-  eau:     {name:'Eau',     fill:'#2f6f80', dark:'#22525f', light:'#5ea3b3'},
-  pierre:  {name:'Pierre',  fill:'#6d6f7a', dark:'#4f515b', light:'#9597a2'},
-  village: {name:'Village', fill:'#b2563a', dark:'#8a3f28', light:'#d3805f'},
-};
-const WEIGHTS = [['foret',30],['champ',25],['eau',20],['pierre',15],['village',10]];
-
-const COMMANDS = {
-  foret_massif5:   {on:'foret',   text:'Massif de 5 forêts'},
-  village_forets3: {on:'village', text:'3 forêts autour'},
-  village_eau:     {on:'village', text:'2 eaux autour'},
-  champ_villages2: {on:'champ',   text:'2 villages autour'},
-  pierre_isolee:   {on:'pierre',  text:'Aucune pierre autour'},
-};
-const CMD_BONUS = 15;
-
-const RARES = {
-  pont:   {on:'eau',   name:'Pont',   hint:'enjambe une case'},
-  moulin: {on:'champ', name:'Moulin', hint:'+4 par village voisin'},
-};
-const RARE_CHANCE = 0.14;
-const MOULIN_BONUS = 4;
-const DISCARDS_MAX = 3;
 
 /* ---------- géométrie ---------- */
 const key = (q,r)=>q+','+r;
@@ -283,8 +265,6 @@ function sides(q,r){                       // bords du plateau touchés (0..5, o
 /* Règle de conception : un objectif ne doit jamais dépendre de ce que la pioche
    donne, seulement de ce que le joueur en fait. Pas de terrain nommé, pas de
    longueur de rivière — uniquement des mesures de placement. */
-const GOAL_BONUS = 30;
-const MASSIF_T = ['foret','champ','pierre'];
 const plein = b=>b.size === cells.length;
 const closedGroups = b=>groups(b, c=>MASSIF_T.includes(c.terrain)).filter(g=>isClosed(b,g));
 const countCmdDone = b=>{ let n=0; for(const [k,c] of b) if(cmdOk(b,k,c)) n++; return n; };
@@ -293,26 +273,26 @@ const seuls = b=>closedGroups(b).filter(g=>g.cells.length===1).length;
 const GOAL_DEFS = {
   fermer: {
     chip:'Massifs de 3+', atEnd:false,
-    need:()=>R>=4?6:4,
-    text:()=>'Fermer '+(R>=4?6:4)+' massifs d’au moins 3 cases, quels qu’ils soient',
-    val:b=>closedGroups(b).filter(g=>g.cells.length>=3).length },
+    need:()=>R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short,
+    text:()=>'Fermer '+(R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short)+' massifs d’au moins '+MASSIF_MIN+' cases, quels qu’ils soient',
+    val:b=>closedGroups(b).filter(g=>g.cells.length>=MASSIF_MIN).length },
   gros: {
     chip:'Grand massif', atEnd:false,
-    need:()=>R>=4?11:8,
-    text:()=>'Un massif fermé de '+(R>=4?11:8)+' cases, n’importe quel terrain',
+    need:()=>R>=R_LONG?GOAL_GROS.long:GOAL_GROS.short,
+    text:()=>'Un massif fermé de '+(R>=R_LONG?GOAL_GROS.long:GOAL_GROS.short)+' cases, n’importe quel terrain',
     val:b=>closedGroups(b).reduce((m,g)=>Math.max(m,g.cells.length),0) },
   commandes: {
     chip:'Commandes', atEnd:false,
-    need:()=>R>=4?5:3,
-    text:()=>(R>=4?'Cinq':'Trois')+' commandes satisfaites',
+    need:()=>R>=R_LONG?GOAL_COMMANDES.long:GOAL_COMMANDES.short,
+    text:()=>(R>=R_LONG?'Cinq':'Trois')+' commandes satisfaites',
     val:countCmdDone },
   tot: {
     chip:'Fermer tôt', atEnd:false,
     need:()=>1,
-    limite:()=>R>=4?46:30,
-    text:()=>'Fermer un massif de 3 cases ou plus avant la '+(R>=4?46:30)+'ᵉ case posée',
-    val:b=>(b.size <= (R>=4?46:30) && closedGroups(b).some(g=>g.cells.length>=3))?1:0,
-    state:b=>{ const l = R>=4?46:30; return b.size<=l ? b.size+'/'+l : 'raté'; } },
+    limite:()=>R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short,
+    text:()=>'Fermer un massif de '+MASSIF_MIN+' cases ou plus avant la '+(R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short)+'ᵉ case posée',
+    val:b=>(b.size <= (R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short) && closedGroups(b).some(g=>g.cells.length>=MASSIF_MIN))?1:0,
+    state:b=>{ const l = R>=R_LONG?GOAL_TOT_LIMIT.long:GOAL_TOT_LIMIT.short; return b.size<=l ? b.size+'/'+l : 'raté'; } },
   defausse: {
     chip:'Sans défausse', atEnd:true,
     need:()=>1,
@@ -320,10 +300,10 @@ const GOAL_DEFS = {
     val:b=>(plein(b) && discards===DISCARDS_MAX)?1:0,
     state:()=>discards===DISCARDS_MAX?'intacte':'perdu' },
   isoles: {
-    chip:()=>'Moins de '+(R>=4?8:6)+' isolés', atEnd:true,
+    chip:()=>'Moins de '+((R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short)+1)+' isolés', atEnd:true,
     need:()=>1,
-    text:()=>'Terminer avec au plus '+(R>=4?7:5)+' massifs réduits à une seule case',
-    val:b=>(plein(b) && seuls(b) <= (R>=4?7:5))?1:0,
+    text:()=>'Terminer avec au plus '+(R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short)+' massifs réduits à une seule case',
+    val:b=>(plein(b) && seuls(b) <= (R>=R_LONG?GOAL_ISOLES.long:GOAL_ISOLES.short))?1:0,
     state:b=>seuls(b)+' isolé'+(seuls(b)>1?'s':'') },
 };
 
@@ -357,7 +337,7 @@ function drawTile(){
   if(rares.length && Math.random()<RARE_CHANCE)
     return {terrain, cmd:null, done:false, rare:rares[(Math.random()*rares.length)|0]};
   const pool = Object.keys(COMMANDS).filter(k=>COMMANDS[k].on===terrain);
-  const cmd = (pool.length && Math.random()<0.32) ? pool[(Math.random()*pool.length)|0] : null;
+  const cmd = (pool.length && Math.random()<CMD_CHANCE) ? pool[(Math.random()*pool.length)|0] : null;
   return {terrain, cmd, done:false, rare:null};
 }
 const drawHand = ()=>[drawTile(),drawTile(),drawTile()];
@@ -366,11 +346,11 @@ const dist = (a,b)=>(Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[0]+a
 
 function seeds(){                              // 4 amorces dispersées : chaque partie démarre autrement
   const out = [[0,0]];
-  const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=2 && d<=3; });
+  const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=SEED_RING_MIN && d<=SEED_RING_MAX; });
   let guard = 0;
-  while(out.length<4 && guard++<400){
+  while(out.length<SEED_COUNT && guard++<400){
     const c = pool[(Math.random()*pool.length)|0];
-    if(out.every(o=>dist(o,c)>=3)) out.push(c);
+    if(out.every(o=>dist(o,c)>=SEED_SPACING)) out.push(c);
   }
   return out;
 }
@@ -453,9 +433,9 @@ function cmdOk(b,k,c){
   const nb = neighbors(q,r).map(n=>b.get(key(n[0],n[1])));
   const count = t=>nb.filter(x=>x&&x.terrain===t).length;
   switch(c.cmd){
-    case 'village_forets3': return count('foret')>=3;
-    case 'village_eau':     return count('eau')>=2;
-    case 'champ_villages2': return count('village')>=2;
+    case 'village_forets3': return count('foret')>=CMD_FORETS3;
+    case 'village_eau':     return count('eau')>=CMD_EAU2;
+    case 'champ_villages2': return count('village')>=CMD_VILLAGES2;
     case 'pierre_isolee':   return nb.length===neighbors(q,r).length &&
                                    neighbors(q,r).every(n=>b.has(key(n[0],n[1]))) && count('pierre')===0;
     case 'foret_massif5': {
@@ -466,7 +446,7 @@ function cmdOk(b,k,c){
           const nk=key(nq,nr), nc=b.get(nk);
           if(nc && nc.terrain==='foret' && !seen.has(nk)){ seen.add(nk); st.push(nk); }
         }}
-      return n>=5;
+      return n>=CMD_MASSIF5;
     }
   }
   return false;
@@ -475,13 +455,13 @@ function cmdOk(b,k,c){
 function score(b){
   let massifs=0, rivieres=0, villages=0, commandes=0;
   const closed = new Set();
-  for(const g of groups(b, c=>['foret','champ','pierre'].includes(c.terrain))){
+  for(const g of groups(b, c=>MASSIF_T.includes(c.terrain))){
     if(isClosed(b,g)){ massifs += g.cells.length*g.cells.length; g.cells.forEach(k=>closed.add(k)); }
     else massifs += g.cells.length;
   }
   const glow = new Set();
   for(const g of waterGroups(b)){
-    rivieres += 3*g.length;
+    rivieres += RIVER_PT*g.length;
     const s = new Set(); g.forEach(k=>{const[q,r]=k.split(',').map(Number); sides(q,r).forEach(i=>s.add(i));});
     if([...s].some(i=>s.has((i+3)%6))){ rivieres += CROSS; g.forEach(k=>glow.add(k)); }
   }
@@ -490,8 +470,8 @@ function score(b){
     const [q,r]=k.split(',').map(Number);
     const nb = neighbors(q,r).map(n=>b.get(key(n[0],n[1]))).filter(Boolean);
     const kinds = new Set(nb.map(x=>x.terrain));
-    let v = 2*kinds.size;
-    if(kinds.has('eau')) v*=2;
+    let v = VILLAGE_PT*kinds.size;
+    if(kinds.has('eau')) v*=VILLAGE_WATER_MULT;
     v += MOULIN_BONUS * nb.filter(x=>x.rare==='moulin').length;
     villages += v;
   }
@@ -683,7 +663,6 @@ function cmdMark(c,x,y,s){
   ctx.restore();
 }
 
-const DUST_MAX = 30;
 function spawnDust(q,r){                         // six grains ocre qui retombent sous la tuile
   if(REDUCED) return;
   const [x,y] = px(q,r), now = performance.now();
@@ -707,7 +686,6 @@ function drawDust(now){
   ctx.restore();
 }
 
-const SMOKE_T = 4800;                            // une volute toutes les 4,8 s par village
 function smoke(x,y,s,q,r,alpha){
   if(REDUCED) return;
   const base = ((q*7 + r*13) % 10 + 10) % 10 / 10 * SMOKE_T;
@@ -725,7 +703,6 @@ function smoke(x,y,s,q,r,alpha){
   ctx.restore();
 }
 
-const LIGHT_T = 30000;                           // durée d'une traversée du nuage
 let lightPath = null;
 function buildLightPath(){                       // la lumière ne passe que sur le pays posé
   if(typeof Path2D==='undefined'){ lightPath = null; return; }
@@ -837,7 +814,7 @@ function render(){
   const target = cachedScore.total;
   if(shownScore !== target){
     const d = target - shownScore;
-    shownScore = REDUCED || Math.abs(d)<1 ? target : shownScore + d*0.12;
+    shownScore = REDUCED || Math.abs(d)<1 ? target : shownScore + d*SCORE_INTERP;
     const v = Math.abs(target-shownScore)<0.5 ? target : Math.round(shownScore);
     if(v===target) shownScore = target;
     el('score').textContent = v;
@@ -856,30 +833,27 @@ function validTargets(){
 }
 
 /* ---------- meilleurs scores ---------- */
-const LS_FMT = 'contree.format';
 function setFormat(r, restart){
-  R = r; CROSS = 10*r;
+  R = r; CROSS = CROSS_FACTOR*r;
   buildShape();
   try{ localStorage.setItem(LS_FMT, String(r)); }catch(e){}
-  el('fmt3').classList.toggle('on', r===3);
-  el('fmt4').classList.toggle('on', r===4);
-  el('lbtitre').textContent = 'Meilleurs scores — '+(r===3?'court':'long');
+  el('fmt3').classList.toggle('on', r===R_SHORT);
+  el('fmt4').classList.toggle('on', r===R_LONG);
+  el('lbtitre').textContent = 'Meilleurs scores — '+(r===R_SHORT?'court':'long');
   if(restart){ layout(); newGame(); }
 }
 
-const LS_KEY = 'contree.scores.v1';
-const TOP_N = 10;
 function loadAll(){
   try{ const v = JSON.parse(localStorage.getItem(LS_KEY)); return Array.isArray(v) ? v : []; }
   catch(e){ return []; }
 }
-const loadScores = ()=>loadAll().filter(x=>(x.f||4)===R);   // un classement par format
+const loadScores = ()=>loadAll().filter(x=>(x.f||R_LONG)===R);   // un classement par format
 function bestScore(){ const l = loadScores(); return l.length ? l[0].t : 0; }
 function saveScore(sc){
   const entry = {t:sc.total, d:Date.now(), f:R, m:sc.massifs, r:sc.rivieres,
                  v:sc.villages, c:sc.commandes, o:sc.objectifs};
   const mine = loadScores().concat([entry]).sort((a,b)=>b.t-a.t).slice(0,TOP_N);
-  const autres = loadAll().filter(x=>(x.f||4)!==R);
+  const autres = loadAll().filter(x=>(x.f||R_LONG)!==R);
   try{ localStorage.setItem(LS_KEY, JSON.stringify(autres.concat(mine))); }catch(e){}
   return {list:mine, entry, rank:mine.indexOf(entry)+1};
 }
@@ -925,10 +899,10 @@ function cmdRow(k,c){
   // sinon on montre l'avancement
   let state;
   switch(c.cmd){
-    case 'village_forets3': state = count('foret')+'/3'; break;
-    case 'village_eau':     state = count('eau')+'/2'; break;
-    case 'champ_villages2': state = count('village')+'/2'; break;
-    case 'foret_massif5':   state = groupOf(board,k).length+'/5'; break;
+    case 'village_forets3': state = count('foret')+'/'+CMD_FORETS3; break;
+    case 'village_eau':     state = count('eau')+'/'+CMD_EAU2; break;
+    case 'champ_villages2': state = count('village')+'/'+CMD_VILLAGES2; break;
+    case 'foret_massif5':   state = groupOf(board,k).length+'/'+CMD_MASSIF5; break;
     case 'pierre_isolee': {
       const libres = neighbors(q,r).filter(n=>!board.has(key(n[0],n[1]))).length;
       state = count('pierre') ? 'perdue' : (libres+' case'+(libres>1?'s':'')+' à remplir');
@@ -942,7 +916,7 @@ function inspectData(k){
   const set = new Set([k]), rows = [];
   let title = TERRAINS[c.terrain].name, rule = '';
 
-  if(['foret','champ','pierre'].includes(c.terrain)){
+  if(MASSIF_T.includes(c.terrain)){
     const g = groupOf(board,k); g.forEach(x=>set.add(x));
     const free = freeAround(g); free.forEach(x=>set.add(x));
     const n = g.length;
@@ -962,8 +936,8 @@ function inspectData(k){
     g.forEach(x=>set.add(x));
     const sd = new Set(); g.forEach(x=>{const[a,b]=x.split(',').map(Number); sides(a,b).forEach(i=>sd.add(i));});
     const cross = [...sd].some(i=>sd.has((i+3)%6));
-    rows.push(['Rivière de '+g.length, pts(3*g.length)]);
-    rows.push(['Une case de plus', '+3 pts', true]);
+    rows.push(['Rivière de '+g.length, pts(RIVER_PT*g.length)]);
+    rows.push(['Une case de plus', '+'+RIVER_PT+' pts', true]);
     rows.push(cross ? ['Traversée du plateau', '+'+CROSS+' acquis']
                     : ['Traversée du plateau', sd.size ? '+'+CROSS+' si elle atteint le bord opposé' : '+'+CROSS+' de bord à bord', true]);
     rule = 'Un pont enjambe une case et raccorde deux tronçons séparés.';
@@ -977,9 +951,9 @@ function inspectData(k){
     const libres = nbk.filter(x=>!board.has(x)).length;
     const moulins = nb.filter(x=>x.rare==='moulin').length;
     const eau = kinds.has('eau');
-    const val = 2*kinds.size*(eau?2:1) + MOULIN_BONUS*moulins;
+    const val = VILLAGE_PT*kinds.size*(eau?VILLAGE_WATER_MULT:1) + MOULIN_BONUS*moulins;
     const maxK = Math.min(5, kinds.size + libres);
-    const pot = 2*maxK*((eau||libres)?2:1) + MOULIN_BONUS*moulins;
+    const pot = VILLAGE_PT*maxK*((eau||libres)?VILLAGE_WATER_MULT:1) + MOULIN_BONUS*moulins;
     rows.push([kinds.size+' terrain'+(kinds.size>1?'s':'')+' différent'+(kinds.size>1?'s':'')+' autour', pts(val)]);
     rows.push(['Bonus eau', eau ? '×2 acquis' : (libres?'×2 si une eau le touche':'hors d’atteinte'), !eau]);
     if(moulins) rows.push(['Moulin voisin', '+'+pts(MOULIN_BONUS*moulins)]);
@@ -1044,10 +1018,8 @@ function snapshot(){
   history.push({board:new Map([...board].map(([k,v])=>[k,{...v}])),
                 hand:hand.map(t=>t&&{...t}), nextHand:nextHand.map(t=>({...t})),
                 discards, goals:goals.map(g=>({...g}))});
-  if(history.length>40) history.shift();
+  if(history.length>HISTORY_MAX) history.shift();
 }
-
-const STEP = 75;                              // décalage entre deux tuiles d'une même fermeture
 
 function cascade(k){                          // révèle le massif fermé depuis la tuile posée
   const now = performance.now();
@@ -1139,7 +1111,7 @@ function finish(){
     '<div class="row rec"><span>'+ligne+'</span><span></span></div>';
   // on laisse la dernière cascade se terminer avant de recouvrir le plateau
   const last = Math.max(performance.now(), ...closedAt.values());
-  setTimeout(showScore, Math.min(2600, last - performance.now() + 900));
+  setTimeout(showScore, Math.min(FINISH_CAP, last - performance.now() + FINISH_MARGIN));
 }
 function showScore(){ over.classList.add('on'); over.classList.remove('fade'); void over.offsetWidth; over.classList.add('fade'); }
 const row = (a,b)=>'<div class="row"><span>'+a+'</span><span>'+b+'</span></div>';
@@ -1248,12 +1220,12 @@ el('closescores').addEventListener('click', ()=>el('scores').classList.remove('o
 el('scores').addEventListener('click', ev=>{ if(ev.target===el('scores')) el('scores').classList.remove('on'); });
 addEventListener('resize', ()=>{ layout(); });
 
-el('fmt3').addEventListener('click', ()=>{ setFormat(3,true); el('sheet').classList.remove('on'); });
-el('fmt4').addEventListener('click', ()=>{ setFormat(4,true); el('sheet').classList.remove('on'); });
+el('fmt3').addEventListener('click', ()=>{ setFormat(R_SHORT,true); el('sheet').classList.remove('on'); });
+el('fmt4').addEventListener('click', ()=>{ setFormat(R_LONG,true); el('sheet').classList.remove('on'); });
 
 addEventListener('pointerdown', ()=>snd.ready(), {once:true});
-let fmt = 3;
-try{ const v = parseInt(localStorage.getItem(LS_FMT),10); if(v===3||v===4) fmt = v; }catch(e){}
+let fmt = R_SHORT;
+try{ const v = parseInt(localStorage.getItem(LS_FMT),10); if(v===R_SHORT||v===R_LONG) fmt = v; }catch(e){}
 setFormat(fmt, false);
 layout(); newGame(); render();
 </script>
