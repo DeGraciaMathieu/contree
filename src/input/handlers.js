@@ -4,7 +4,7 @@ import { R_SHORT, R_LONG } from '../config.js';
 import { key } from '../rules/geometry.js';
 import { G, validTargets } from '../state/game.js';
 import { cv, hexAt, layout } from '../render/board.js';
-import { showInspect, hideInspect, showScores, showScore, refreshDelta } from '../render/ui.js';
+import { showInspect, hideInspect, showScores, showScore, refreshDelta, hideStart } from '../render/ui.js';
 import { commit, discard, undo, newGame, setFormat } from '../loop/turn.js';
 import { el, over } from '../render/dom.js';
 import { snd } from '../render/sound.js';
@@ -54,4 +54,7 @@ export function bindInputs(){
 
   el('fmt3').addEventListener('click', ()=>{ setFormat(R_SHORT,true); el('sheet').classList.remove('on'); });
   el('fmt4').addEventListener('click', ()=>{ setFormat(R_LONG,true); el('sheet').classList.remove('on'); });
+
+  el('start3').addEventListener('click', ()=>{ setFormat(R_SHORT,true); hideStart(); });   // écran d'accueil
+  el('start4').addEventListener('click', ()=>{ setFormat(R_LONG,true); hideStart(); });
 }

@@ -5,6 +5,7 @@ import { G } from './state/game.js';
 import { layout, render } from './render/board.js';
 import { newGame, setFormat } from './loop/turn.js';
 import { bindInputs } from './input/handlers.js';
+import { showStart } from './render/ui.js';
 import { snd } from './render/sound.js';
 
 addEventListener('pointerdown', ()=>snd.ready(), {once:true});
@@ -14,3 +15,4 @@ let fmt = R_SHORT;
 try{ const v = parseInt(localStorage.getItem(LS_FMT),10); if(v===R_SHORT||v===R_LONG) fmt = v; }catch(e){}
 setFormat(fmt, false);
 layout(); newGame(); render();
+showStart();                                     // proposer Court / Long avant de jouer

@@ -146,6 +146,39 @@
   .next .link:first-of-type{margin-left:auto}
   .slot .cmd.rare{color:#f0d089;font-weight:600}
   #discard{white-space:nowrap}
+  /* écran d'accueil */
+  .start .start-card{width:100%;max-width:360px;text-align:center;
+    background:radial-gradient(120% 90% at 50% 0,#183031,var(--ink-2));
+    border:1px solid var(--line);border-radius:22px;padding:32px 26px 24px;
+    box-shadow:0 26px 60px -22px rgba(0,0,0,.75);
+    animation:startrise .5s cubic-bezier(.2,.85,.3,1) both}
+  @keyframes startrise{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+  .start-emo{font-size:34px;line-height:1;margin-bottom:4px;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+  .start .start-card h2{font-family:'Fraunces',serif;font-weight:600;font-size:42px;
+    color:var(--pale);margin:0;letter-spacing:.01em;text-shadow:0 2px 14px rgba(0,0,0,.35)}
+  .start-tag{font-size:13px;line-height:1.55;color:var(--muted);margin:10px 2px 0}
+  .terrains{display:flex;justify-content:center;gap:9px;margin:22px 0 2px}
+  .terrains .hex{width:22px;height:25px;background:var(--c);
+    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);
+    box-shadow:0 3px 7px rgba(0,0,0,.35);animation:hexpop .45s ease both}
+  .terrains .hex:nth-child(2){animation-delay:.06s}
+  .terrains .hex:nth-child(3){animation-delay:.12s}
+  .terrains .hex:nth-child(4){animation-delay:.18s}
+  .terrains .hex:nth-child(5){animation-delay:.24s}
+  @keyframes hexpop{from{opacity:0;transform:translateY(7px) scale(.6)}to{opacity:1;transform:none}}
+  .start-prompt{font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:20px 0 11px}
+  .formats{display:flex;gap:10px}
+  .fmt-choice{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:16px 8px;border-radius:15px;border:1px solid var(--line);background:var(--ink-3);
+    cursor:pointer;transition:transform .1s ease,border-color .18s ease,background .18s ease}
+  .fmt-choice:hover{border-color:var(--ochre-dim);transform:translateY(-2px)}
+  .fmt-choice b{font-family:'Fraunces',serif;font-weight:600;font-size:21px;color:var(--pale)}
+  .fmt-choice span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .fmt-choice em{font-style:normal;font-size:10.5px;color:var(--ochre-dim);letter-spacing:.03em;margin-top:3px}
+  .fmt-choice.on{border-color:var(--ochre);background:#1d2a20}
+  .fmt-choice.on b,.fmt-choice.on em{color:var(--ochre)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -198,6 +231,26 @@
     <button id="sound" class="link ico" title="Son" aria-label="Son">♪</button>
     <button id="rules" class="link ico" title="Règles" aria-label="Règles">?</button>
     <button id="reset" class="link ico" title="Nouvelle partie" aria-label="Nouvelle partie">↻</button>
+  </div>
+</div>
+
+<div class="modal start" id="start">
+  <div class="start-card">
+    <div class="start-emo">🌿</div>
+    <h2>Contrée</h2>
+    <p class="start-tag">Compose ton pays, tuile après tuile.<br>Ferme des massifs, trace des rivières, anime tes villages.</p>
+    <div class="terrains" aria-hidden="true">
+      <span class="hex" style="--c:#3d6b46"></span>
+      <span class="hex" style="--c:#b9903c"></span>
+      <span class="hex" style="--c:#2f6f80"></span>
+      <span class="hex" style="--c:#6d6f7a"></span>
+      <span class="hex" style="--c:#b2563a"></span>
+    </div>
+    <p class="start-prompt">Choisis la taille du plateau</p>
+    <div class="formats">
+      <button class="fmt-choice" data-r="3" id="start3"><b>Court</b><span>37 cases</span><em>une partie vive</em></button>
+      <button class="fmt-choice" data-r="4" id="start4"><b>Long</b><span>61 cases</span><em>une grande fresque</em></button>
+    </div>
   </div>
 </div>
 

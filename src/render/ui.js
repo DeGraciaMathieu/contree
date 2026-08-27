@@ -1,7 +1,8 @@
 // Rendu de l'interface HTML : main, objectifs, panneau d'inspection, delta de pose,
 // classement. Lit l'état G et écrit dans le DOM.
 import { RARES, COMMANDS, CMD_BONUS, CMD_FORETS3, CMD_EAU2, CMD_VILLAGES2, CMD_MASSIF5,
-         MASSIF_T, RIVER_PT, TERRAINS, VILLAGE_PT, VILLAGE_WATER_MULT, MOULIN_BONUS, GOAL_BONUS } from '../config.js';
+         MASSIF_T, RIVER_PT, TERRAINS, VILLAGE_PT, VILLAGE_WATER_MULT, MOULIN_BONUS, GOAL_BONUS,
+         R_SHORT, R_LONG } from '../config.js';
 import { key } from '../rules/geometry.js';
 import { waterGroups } from '../rules/groups.js';
 import { GOAL_DEFS } from '../rules/goals.js';
@@ -203,3 +204,10 @@ export function showScores(){
 }
 
 export function showScore(){ over.classList.add('on'); over.classList.remove('fade'); void over.offsetWidth; over.classList.add('fade'); }
+
+export function showStart(){                       // écran d'accueil : choix du format avant de jouer
+  el('start3').classList.toggle('on', G.R===R_SHORT);   // met en évidence le dernier format choisi
+  el('start4').classList.toggle('on', G.R===R_LONG);
+  el('start').classList.add('on');
+}
+export function hideStart(){ el('start').classList.remove('on'); }
