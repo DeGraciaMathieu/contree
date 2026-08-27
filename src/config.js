@@ -56,6 +56,7 @@ export const SEED_COUNT = 4;      // nombre d'amorces
 export const SEED_RING_MIN = 2;   // distance minimale au centre
 export const SEED_RING_MAX = 3;   // distance maximale au centre
 export const SEED_SPACING = 3;    // écart minimal entre deux amorces
+export const SEED_GUARD_MAX = 400; // garde anti-boucle du placement des amorces
 
 /* ---------- objectifs de partie ---------- */
 export const GOAL_BONUS = 30;
@@ -69,6 +70,9 @@ export const GOAL_ISOLES = {long:7, short:5};      // isolés tolérés en fin d
 /* ---------- animation et rendu ---------- */
 export const STEP = 75;           // décalage ms entre deux tuiles d'une fermeture
 export const JOLT_DELAY = 40;     // délai ms avant le choc encaissé par une voisine
+export const VIBRATE_PLACE = 8;              // vibration à la pose
+export const VIBRATE_DISCARD = 6;            // vibration à la défausse
+export const VIBRATE_CASCADE = [0,8,60,14];  // vibration à la fermeture d'un massif
 export const DUST_MAX = 30;       // grains de poussière simultanés
 export const SMOKE_T = 4800;      // période d'une volute de fumée (ms)
 export const LIGHT_T = 30000;     // durée d'une traversée du nuage (ms)

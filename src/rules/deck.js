@@ -2,7 +2,7 @@
 // des amorces initiales. Fonctions pures : le hasard arrive par le rng injecté, les
 // cases du plateau par argument.
 import { WEIGHTS, RARES, COMMANDS, RARE_CHANCE, CMD_CHANCE,
-         SEED_COUNT, SEED_RING_MIN, SEED_RING_MAX, SEED_SPACING } from '../config.js';
+         SEED_COUNT, SEED_RING_MIN, SEED_RING_MAX, SEED_SPACING, SEED_GUARD_MAX } from '../config.js';
 import { dist } from './geometry.js';
 
 export function drawTerrain(rng){
@@ -28,7 +28,7 @@ export function seeds(rng, cells){             // 4 amorces dispersées : chaque
   const out = [[0,0]];
   const pool = cells.filter(c=>{ const d = dist(c,[0,0]); return d>=SEED_RING_MIN && d<=SEED_RING_MAX; });
   let guard = 0;
-  while(out.length<SEED_COUNT && guard++<400){
+  while(out.length<SEED_COUNT && guard++<SEED_GUARD_MAX){
     const c = pool[(rng()*pool.length)|0];
     if(out.every(o=>dist(o,c)>=SEED_SPACING)) out.push(c);
   }

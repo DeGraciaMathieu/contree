@@ -16,7 +16,7 @@ const seuls = (b,ctx)=>closedGroups(b,ctx).filter(g=>g.cells.length===1).length;
 
 export const GOAL_DEFS = {
   fermer: {
-    chip:'Massifs de 3+', atEnd:false,
+    chip:'Massifs de '+MASSIF_MIN+'+', atEnd:false,
     need:ctx=>ctx.R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short,
     text:ctx=>'Fermer '+(ctx.R>=R_LONG?GOAL_FERMER.long:GOAL_FERMER.short)+' massifs d’au moins '+MASSIF_MIN+' cases, quels qu’ils soient',
     val:(b,ctx)=>closedGroups(b,ctx).filter(g=>g.cells.length>=MASSIF_MIN).length },

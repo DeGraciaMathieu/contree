@@ -1,7 +1,8 @@
 // Boucle de jeu au tour par tour : intention → règle → état → rendu. Orchestre les
 // règles pures, l'état G, le rendu et le son ; contient le timing d'animation (cascade,
 // délai de fin) qui n'est pas une règle.
-import { DISCARDS_MAX, STEP, JOLT_DELAY, FINISH_CAP, FINISH_MARGIN, CROSS_FACTOR, LS_FMT, R_SHORT, R_LONG } from '../config.js';
+import { DISCARDS_MAX, STEP, JOLT_DELAY, FINISH_CAP, FINISH_MARGIN, CROSS_FACTOR, LS_FMT, R_SHORT, R_LONG,
+         VIBRATE_PLACE, VIBRATE_DISCARD, VIBRATE_CASCADE } from '../config.js';
 import { key } from '../rules/geometry.js';
 import { drawTerrain, drawHand, seeds } from '../rules/deck.js';
 import { drawGoals } from '../rules/goals.js';
@@ -61,7 +62,7 @@ function cascade(k){                          // révèle le massif fermé depui
     G.closedAt.set(c, now + i*STEP);
     snd.carillon(i, ordered.length, i*STEP/1000);
   });
-  buzz([0,8,60,14]);
+  buzz(VIBRATE_CASCADE);
 }
 
 export function commit(){
@@ -77,7 +78,7 @@ export function commit(){
   const gain = G.cachedScore.total - before;
   G.effects.push({type:'pop',k,t:performance.now()});
   if(gain!==0) G.effects.push({type:'float',q:G.ghost[0],r:G.ghost[1],n:gain,t:performance.now()});
-  snd.clac(); buzz(8); hideInspect();
+  snd.clac(); buzz(VIBRATE_PLACE); hideInspect();
   spawnDust(G.ghost[0],G.ghost[1]);
   const [cx,cy] = px(G.ghost[0],G.ghost[1]);
   for(const [nq,nr] of neighbors(G.ghost[0],G.ghost[1])){
@@ -100,7 +101,7 @@ export function discard(){
   G.discards--;
   G.hand[G.sel] = null; G.ghost = null; G.sel = null;
   if(G.hand.every(t=>t===null)){ G.hand = G.nextHand; G.nextHand = drawHand(G.rng); G.deal = true; }
-  snd.defausse(); buzz(6);
+  snd.defausse(); buzz(VIBRATE_DISCARD);
   el('hint').textContent = G.discards ? 'Tuile écartée. Il t’en reste '+G.discards+'.' : 'Tuile écartée. C’était la dernière.';
   renderAll();
 }
