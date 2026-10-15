@@ -4,10 +4,10 @@
 // case jouable, garde le coup qui fait le plus monter le score, et ne défausse jamais.
 //
 //   npm run sim -- --n=1000 --format=court --graine=1
-import { R_SHORT, R_LONG, CROSS_FACTOR, DISCARDS_MAX, BAG, RARES, COMMANDS } from '../src/config.js';
+import { R_SHORT, R_LONG, CROSS_FACTOR, DISCARDS_MAX, WEIGHTS, RARES, COMMANDS } from '../src/config.js';
 import { createRng } from '../src/rules/rng.js';
 import { buildCells, key } from '../src/rules/geometry.js';
-import { buildBag, drawTerrain, drawHand, seeds } from '../src/rules/deck.js';
+import { drawTerrain, drawHand, seeds } from '../src/rules/deck.js';
 import { drawGoals, goalOk, GOAL_DEFS } from '../src/rules/goals.js';
 import { cmdOk } from '../src/rules/commands.js';
 import { score } from '../src/rules/score.js';
@@ -18,22 +18,20 @@ const POSTES = ['massifs', 'rivieres', 'villages', 'commandes', 'objectifs'];
 function playGame(R, rng){
   const cells = buildCells(R);
   const ctx = {R, CROSS:CROSS_FACTOR*R, cells, goals:null, discards:DISCARDS_MAX};
-  let bag = buildBag();
   const board = new Map();
   for(const [q,r] of seeds(rng, cells)){
-    const d = drawTerrain(bag, rng); bag = d.bag;
-    board.set(key(q,r), {terrain:d.terrain, cmd:null, done:false, rare:null});
+    board.set(key(q,r), {terrain:drawTerrain(rng), cmd:null, done:false, rare:null});
   }
   ctx.goals = drawGoals(rng);
-  let d = drawHand(bag, rng); let hand = d.hand; bag = d.bag;
-  d = drawHand(bag, rng); let nextHand = d.hand; bag = d.bag;
+  let hand = drawHand(rng);
+  let nextHand = drawHand(rng);
 
   while(board.size < cells.length){
     const best = bestMove(board, hand, ctx);
     board.set(best.k, {...hand[best.i]});
     for(const g of ctx.goals) if(!g.done && goalOk(board, g, ctx)) g.done = true;   // un objectif atteint reste acquis
     hand[best.i] = null;
-    if(hand.every(t=>t===null)){ hand = nextHand; d = drawHand(bag, rng); nextHand = d.hand; bag = d.bag; }
+    if(hand.every(t=>t===null)){ hand = nextHand; nextHand = drawHand(rng); }
   }
   return {board, goals:ctx.goals, score:score(board, ctx), ctx};
 }
@@ -55,7 +53,7 @@ function bestMove(board, hand, ctx){
 
 function collect(game){
   const {board, goals, score:s, ctx} = game;
-  const terrains = Object.fromEntries(BAG.map(([t])=>[t,0]));
+  const terrains = Object.fromEntries(WEIGHTS.map(([t])=>[t,0]));
   const rares = Object.fromEntries(Object.keys(RARES).map(r=>[r,0]));
   const cmds = [];
   for(const [k,c] of board){
